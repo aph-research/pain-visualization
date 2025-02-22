@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Flexible Kernel Stuart-Landau Oscillators</title>
+    <style>
+        body { 
+            margin: 0; 
+            padding: 0; 
+            overflow: hidden;
+            background-color: #000;
+            font-family: Arial, sans-serif;
+        }
+        canvas { 
+            display: block; 
+        }
+        .controls { 
+            position: absolute; 
+            top: 10px; 
+            left: 10px; 
+            background-color: rgba(255, 255, 255, 0.9); 
+            padding: 15px;
+            border-radius: 8px;
+        }
+        .control-group {
+            display: flex;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        .control-group label {
+            width: 120px;
+            font-size: 14px;
+        }
+        .control-group input[type="range"] {
+            width: 150px;
+            margin: 0 10px;
+        }
+        .value-display {
+            width: 50px;
+            text-align: right;
+        }
+    </style>
+</head>
+<body>
+    <div class="controls">
+        <!-- Base Stuart-Landau parameters -->
+        <div class="control-group">
+            <label for="lambda">Base Excitability (λ):</label>
+            <input type="range" id="lambda" min="0" max="0.5" step="0.01" value="0.1">
+            <span id="lambdaValue" class="value-display">0.1</span>
+        </div>
+        <div class="control-group">
+            <label for="omega">Natural Frequency (ω):</label>
+            <input type="range" id="omega" min="0" max="2" step="0.01" value="0.6">
+            <span id="omegaValue" class="value-display">0.6</span>
+        </div>
+        
+        <!-- Coupling kernels -->
+        <div class="control-group">
+            <label for="coupling1">Coupling (1):</label>
+            <input type="range" id="coupling1" min="-1" max="1" step="0.01" value="0.2">
+            <span id="coupling1Value" class="value-display">0.2</span>
+        </div>
+        <div class="control-group">
+            <label for="coupling2">Coupling (2):</label>
+            <input type="range" id="coupling2" min="-1" max="1" step="0.01" value="0.1">
+            <span id="coupling2Value" class="value-display">0.1</span>
+        </div>
+        <div class="control-group">
+            <label for="coupling3">Coupling (3):</label>
+            <input type="range" id="coupling3" min="-1" max="1" step="0.01" value="0.05">
+            <span id="coupling3Value" class="value-display">0.05</span>
+        </div>
+        
+        <!-- Small World coupling -->
+        <div class="control-group">
+            <label for="smallWorld">Small World:</label>
+            <input type="range" id="smallWorld" min="-1" max="1" step="0.01" value="0">
+            <span id="smallWorldValue" class="value-display">0</span>
+        </div>
+
+        <!-- Divisive Normalization Strength Slider -->
+        <div class="control-group">
+            <label for="beta">Normalization (β):</label>
+            <input type="range" id="beta" min="0" max="5" step="0.1" value="1.0">
+            <span id="betaValue" class="value-display">1.0</span>
+        </div>
+
+        <!-- Visualization mode selector -->
+        <div class="control-group" style="margin-top: 15px;">
+            <label for="vizMode">Visualization:</label>
+            <select id="vizMode" style="padding: 5px;">
+                <option value="both">Phase & Amplitude</option>
+                <option value="phase">Phase Only</option>
+                <option value="amplitude">Amplitude Only</option>
+            </select>
+        </div>
+
+        <!-- Dissonance Measure Display -->
+        <div class="control-group">
+            <label>Dissonance:</label>
+            <span id="dissonanceValue" class="value-display">0.00</span>
+        </div>
+
+        <button id="triggerAttack" style="margin-top: 10px; padding: 8px 16px; cursor: pointer; background-color: #4CAF50; color: white; border: none; border-radius: 4px;">Trigger Attack</button>
+    </div>
+    <canvas id="canvas"></canvas>
+    <script src="stuart-landau-2d-dn.js"></script>
+</body>
+</html>
