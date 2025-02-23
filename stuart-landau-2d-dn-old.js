@@ -99,16 +99,59 @@ const kernels = {
     ]
 };
 
+// Compute coupling with flexible kernels and small world
+function computeFlexibleCoupling(z, couplingStrengths) {
+    const result = Array(N).fill().map(() => 
+        Array(N).fill().map(() => ({ real: 0, imag: 0 }))
+    );
+    
+    // Apply each kernel with its coupling strength
+    Object.entries(kernels).forEach(([distance, kernel], idx) => {
+        const K = couplingStrengths[idx];
+        const size = kernel.length;
+        const offset = Math.floor(size / 2);
+        
+        for (let i = 0; i < N; i++) {
+            for (let j = 0; j < N; j++) {
+                for (let ki = 0; ki < size; ki++) {
+                    for (let kj = 0; kj < size; kj++) {
+                        const ni = (i + ki - offset + N) % N;
+                        const nj = (j + kj - offset + N) % N;
+                        
+                        if (kernel[ki][kj] !== 0) {
+                            result[i][j].real += K * kernel[ki][kj] * z[ni][nj].real;
+                            result[i][j].imag += K * kernel[ki][kj] * z[ni][nj].imag;
+                        }
+                    }
+                }
+                
+                // Add small world coupling
+                for (const neighbor of smallWorldNeighbors[i][j]) {
+                    const ni = neighbor.row;
+                    const nj = neighbor.col;
+                    result[i][j].real += smallWorldCoupling * (z[ni][nj].real - z[i][j].real);
+                    result[i][j].imag += smallWorldCoupling * (z[ni][nj].imag - z[i][j].imag);
+                }
+            }
+        }
+    });
+    
+    return result;
+}
+
 function update() {
     const couplingStrengths = [coupling1, coupling2, coupling3];
     const coupling = computeFlexibleCoupling(z, couplingStrengths);
+    
+    // Compute the local normalization field from the current amplitudes
+    const localNorm = computeLocalNormalization();
     
     for (let i = 0; i < N; i++) {
         for (let j = 0; j < N; j++) {
             const current = z[i][j];
             const normSq = current.real * current.real + current.imag * current.imag;
             
-            // Local parameters for attack simulation
+            // Local parameters for attack simulation (same as before)
             let localLambda = lambda;
             let localInput = 0;
             if (isAttackActive && 
@@ -130,12 +173,16 @@ function update() {
                 };
             };
 
-            // RK4 integration
+            // RK4 integration (same as before)
             const delta = rk4Step(current.real, current.imag, dt, derivs);
             
-            // Update state
-            z[i][j].real += delta.real;
-            z[i][j].imag += delta.imag;
+            // Compute normalization factor (prevent runaway by scaling derivative)
+            // Here, normFactor = 1 + beta * localNorm[i][j]
+            const normFactor = 1 + beta * localNorm[i][j];
+            
+            // Update state with divisive normalization applied:
+            z[i][j].real += dt * delta.real / normFactor;
+            z[i][j].imag += dt * delta.imag / normFactor;
         }
     }
 }
@@ -193,6 +240,67 @@ function draw() {
     }
 }
 
+// New DN parameter (divisive normalization strength)
+let beta = 1.0;  // Adjust this value to change the normalization strength
+
+// Define a function to create a Gaussian kernel
+function gaussianKernel(size, sigma) {
+    let kernel = [];
+    let sum = 0;
+    let half = Math.floor(size / 2);
+    for (let i = -half; i <= half; i++) {
+        kernel[i + half] = [];
+        for (let j = -half; j <= half; j++) {
+            let val = Math.exp(-(i * i + j * j) / (2 * sigma * sigma));
+            kernel[i + half][j + half] = val;
+            sum += val;
+        }
+    }
+    // Normalize the kernel so that the sum is 1.
+    for (let i = 0; i < size; i++) {
+        for (let j = 0; j < size; j++) {
+            kernel[i][j] /= sum;
+        }
+    }
+    return kernel;
+}
+
+// Pre-compute a Gaussian kernel for the DN calculation:
+const kernelSize = 5;
+const sigmaDN = 2;
+const gaussKernel = gaussianKernel(kernelSize, sigmaDN);
+
+// Compute local normalization: for each cell, convolve the amplitude field with the Gaussian kernel.
+function computeLocalNormalization() {
+    const localNorm = [];
+    // Create a 2D amplitude array from z
+    const amplitude = [];
+    for (let i = 0; i < N; i++) {
+        amplitude[i] = [];
+        for (let j = 0; j < N; j++) {
+            const a = Math.sqrt(z[i][j].real * z[i][j].real + z[i][j].imag * z[i][j].imag);
+            amplitude[i][j] = a;
+        }
+    }
+    // Convolve amplitude with gaussKernel using periodic boundaries
+    const half = Math.floor(kernelSize / 2);
+    for (let i = 0; i < N; i++) {
+        localNorm[i] = [];
+        for (let j = 0; j < N; j++) {
+            let sum = 0;
+            for (let ki = -half; ki <= half; ki++) {
+                for (let kj = -half; kj <= half; kj++) {
+                    const ni = (i + ki + N) % N;
+                    const nj = (j + kj + N) % N;
+                    sum += amplitude[ni][nj] * gaussKernel[ki + half][kj + half];
+                }
+            }
+            localNorm[i][j] = sum;
+        }
+    }
+    return localNorm;
+}
+
 // Function to compute global dissonance of the current field configuration
 function computeDissonance() {
     let totalDissonance = 0;
@@ -237,79 +345,6 @@ function computeDissonance() {
         }
     }
     return count > 0 ? totalDissonance / count : 0;
-}
-
-// Add DN parameters
-let a = 1.0;  // activation amplitude
-let b = 20.0; // activation constant
-let c = 1.0;  // normalization amplitude
-let d = 40.0; // normalization constant
-
-// Compute coupling with flexible kernels and DN terms
-function computeFlexibleCoupling(z, couplingStrengths) {
-    const result = Array(N).fill().map(() => 
-        Array(N).fill().map(() => ({ real: 0, imag: 0 }))
-    );
-    
-    // First compute amplitude field
-    const amplitudes = Array(N).fill().map((_, i) => 
-        Array(N).fill().map((_, j) => 
-            Math.sqrt(z[i][j].real * z[i][j].real + z[i][j].imag * z[i][j].imag)
-        )
-    );
-    
-    // Compute activation (G₁) and normalization (G₂) terms using your discrete kernels
-    const activationField = Array(N).fill().map(() => Array(N).fill(0));
-    const normalizationField = Array(N).fill().map(() => Array(N).fill(0));
-    
-    // Apply kernels with different coupling strengths for activation (G₁)
-    Object.entries(kernels).forEach(([distance, kernel], idx) => {
-        const K = couplingStrengths[idx];
-        const size = kernel.length;
-        const offset = Math.floor(size / 2);
-        
-        for (let i = 0; i < N; i++) {
-            for (let j = 0; j < N; j++) {
-                for (let ki = 0; ki < size; ki++) {
-                    for (let kj = 0; kj < size; kj++) {
-                        const ni = (i + ki - offset + N) % N;
-                        const nj = (j + kj - offset + N) % N;
-                        
-                        if (kernel[ki][kj] !== 0) {
-                            activationField[i][j] += K * kernel[ki][kj] * amplitudes[ni][nj];
-                            // Use a different spread for normalization field (G₂)
-                            normalizationField[i][j] += (K * 1.5) * kernel[ki][kj] * amplitudes[ni][nj];
-                        }
-                    }
-                }
-            }
-        }
-    });
-    
-    // Compute final coupling term including DN and small world
-    for (let i = 0; i < N; i++) {
-        for (let j = 0; j < N; j++) {
-            // Compute DN ratio
-            const numerator = a * activationField[i][j] + b;
-            const denominator = c * normalizationField[i][j] + d;
-            const dnFactor = numerator / denominator;
-            
-            // Preserve phase from original oscillator
-            const phase = Math.atan2(z[i][j].imag, z[i][j].real);
-            result[i][j].real = dnFactor * Math.cos(phase);
-            result[i][j].imag = dnFactor * Math.sin(phase);
-            
-            // Add small world coupling
-            for (const neighbor of smallWorldNeighbors[i][j]) {
-                const ni = neighbor.row;
-                const nj = neighbor.col;
-                result[i][j].real += smallWorldCoupling * (z[ni][nj].real - z[i][j].real);
-                result[i][j].imag += smallWorldCoupling * (z[ni][nj].imag - z[i][j].imag);
-            }
-        }
-    }
-    
-    return result;
 }
 
 // In your animation loop, update the dissonance display.
@@ -359,30 +394,14 @@ document.getElementById('smallWorld').addEventListener('input', (e) => {
     document.getElementById('smallWorldValue').textContent = smallWorldCoupling.toFixed(2);
 });
 
+document.getElementById('beta').addEventListener('input', (e) => {
+    beta = parseFloat(e.target.value);
+    document.getElementById('betaValue').textContent = beta.toFixed(1);
+});
+
 // Setup visualization mode control
 document.getElementById('vizMode').addEventListener('change', (e) => {
     vizMode = e.target.value;
-});
-
-// DN Parameter Controls
-document.getElementById('activationAmp').addEventListener('input', (e) => {
-    a = parseFloat(e.target.value);
-    document.getElementById('activationAmpValue').textContent = a.toFixed(1);
-});
-
-document.getElementById('activationConst').addEventListener('input', (e) => {
-    b = parseFloat(e.target.value);
-    document.getElementById('activationConstValue').textContent = b.toFixed(1);
-});
-
-document.getElementById('normAmp').addEventListener('input', (e) => {
-    c = parseFloat(e.target.value);
-    document.getElementById('normAmpValue').textContent = c.toFixed(1);
-});
-
-document.getElementById('normConst').addEventListener('input', (e) => {
-    d = parseFloat(e.target.value);
-    document.getElementById('normConstValue').textContent = d.toFixed(1);
 });
 
 document.getElementById('triggerAttack').addEventListener('click', () => {
