@@ -4,7 +4,7 @@ const ctx = canvas.getContext('2d');
 // Grid parameters
 let N = 100;  // Reduced grid size for performance
 let cellSize;
-const dt = 0.5;  // Larger time step for performance
+const dt = 0.2;  // Larger time step for performance
 
 // Use RK4 integration for stability with larger time step
 function rk4Step(x, y, dt, f) {
@@ -38,7 +38,7 @@ function resizeCanvas() {
 // Control parameters
 let lambda = 0.1;  // Base excitability
 let vizMode = 'both'; // Visualization mode
-let omega = 0.6;  // Natural frequency
+let omega = 0.15;  // Natural frequency
 let coupling1 = 0.2;
 let coupling2 = 0.1;
 let coupling3 = 0.05;
@@ -99,20 +99,27 @@ const kernels = {
     ]
 };
 
+function createGridArray() {
+    return Array.from({ length: N }, () =>
+        Array.from({ length: N }, () => ({ real: 0, imag: 0 }))
+    );
+}
+
 function update() {
-    const couplingStrengths = [coupling1, coupling2, coupling3];
-    const coupling = computeFlexibleCoupling(z, couplingStrengths);
+    // We'll perform a full-grid RK4 update where we recompute the coupling field at each sub-step.
+    // dt is our time step.
     
+    // ---- k1 Step ----
+    const coupling_k1 = computeFlexibleCoupling(z, [coupling1, coupling2, coupling3]);
+    const k1 = createGridArray();
+    const z_temp1 = createGridArray(); // will hold z + (dt/2)*k1
     for (let i = 0; i < N; i++) {
         for (let j = 0; j < N; j++) {
-            const current = z[i][j];
-            const normSq = current.real * current.real + current.imag * current.imag;
-            
-            // Local parameters for attack simulation
+            // Local parameters (attack simulation remains unchanged)
             let localLambda = lambda;
             let localInput = 0;
-            if (isAttackActive && 
-                i >= N/2 - N/10 && i < N/2 + N/10 && 
+            if (isAttackActive &&
+                i >= N/2 - N/10 && i < N/2 + N/10 &&
                 j >= N/2 - N/10 && j < N/2 + N/10) {
                 localLambda = lambda * 5;
                 localInput = 1.0;
@@ -120,22 +127,99 @@ function update() {
                     localInput += Math.random() * 0.5;
                 }
             }
-            
-            // Create derivative function for RK4
-            const derivs = (x, y) => {
-                const ns = x * x + y * y;
-                return {
-                    real: (localLambda - ns) * x - omega * y + coupling[i][j].real + localInput,
-                    imag: (localLambda - ns) * y + omega * x + coupling[i][j].imag
-                };
-            };
-
-            // RK4 integration
-            const delta = rk4Step(current.real, current.imag, dt, derivs);
-            
-            // Update state
-            z[i][j].real += delta.real;
-            z[i][j].imag += delta.imag;
+            const current = z[i][j];
+            const ns = current.real * current.real + current.imag * current.imag;
+            const f_real = (localLambda - ns) * current.real - omega * current.imag + coupling_k1[i][j].real + localInput;
+            const f_imag = (localLambda - ns) * current.imag + omega * current.real + coupling_k1[i][j].imag;
+            k1[i][j] = { real: f_real, imag: f_imag };
+            z_temp1[i][j] = { real: current.real + (dt/2) * f_real, imag: current.imag + (dt/2) * f_imag };
+        }
+    }
+    
+    // ---- k2 Step ----
+    const coupling_k2 = computeFlexibleCoupling(z_temp1, [coupling1, coupling2, coupling3]);
+    const k2 = createGridArray();
+    const z_temp2 = createGridArray(); // will hold z + (dt/2)*k2 (using original z)
+    for (let i = 0; i < N; i++) {
+        for (let j = 0; j < N; j++) {
+            let localLambda = lambda;
+            let localInput = 0;
+            if (isAttackActive &&
+                i >= N/2 - N/10 && i < N/2 + N/10 &&
+                j >= N/2 - N/10 && j < N/2 + N/10) {
+                localLambda = lambda * 5;
+                localInput = 1.0;
+                if (Math.random() < 0.1) {
+                    localInput += Math.random() * 0.5;
+                }
+            }
+            const current = z_temp1[i][j];
+            const ns = current.real * current.real + current.imag * current.imag;
+            const f_real = (localLambda - ns) * current.real - omega * current.imag + coupling_k2[i][j].real + localInput;
+            const f_imag = (localLambda - ns) * current.imag + omega * current.real + coupling_k2[i][j].imag;
+            k2[i][j] = { real: f_real, imag: f_imag };
+            // For k2, we use the original z for the update: z_temp2 = z + (dt/2)*k2
+            const orig = z[i][j];
+            z_temp2[i][j] = { real: orig.real + (dt/2) * f_real, imag: orig.imag + (dt/2) * f_imag };
+        }
+    }
+    
+    // ---- k3 Step ----
+    const coupling_k3 = computeFlexibleCoupling(z_temp2, [coupling1, coupling2, coupling3]);
+    const k3 = createGridArray();
+    const z_temp3 = createGridArray(); // will hold z + dt*k3 (using original z)
+    for (let i = 0; i < N; i++) {
+        for (let j = 0; j < N; j++) {
+            let localLambda = lambda;
+            let localInput = 0;
+            if (isAttackActive &&
+                i >= N/2 - N/10 && i < N/2 + N/10 &&
+                j >= N/2 - N/10 && j < N/2 + N/10) {
+                localLambda = lambda * 5;
+                localInput = 1.0;
+                if (Math.random() < 0.1) {
+                    localInput += Math.random() * 0.5;
+                }
+            }
+            const current = z_temp2[i][j];
+            const ns = current.real * current.real + current.imag * current.imag;
+            const f_real = (localLambda - ns) * current.real - omega * current.imag + coupling_k3[i][j].real + localInput;
+            const f_imag = (localLambda - ns) * current.imag + omega * current.real + coupling_k3[i][j].imag;
+            k3[i][j] = { real: f_real, imag: f_imag };
+            const orig = z[i][j];
+            z_temp3[i][j] = { real: orig.real + dt * f_real, imag: orig.imag + dt * f_imag };
+        }
+    }
+    
+    // ---- k4 Step ----
+    const coupling_k4 = computeFlexibleCoupling(z_temp3, [coupling1, coupling2, coupling3]);
+    const k4 = createGridArray();
+    for (let i = 0; i < N; i++) {
+        for (let j = 0; j < N; j++) {
+            let localLambda = lambda;
+            let localInput = 0;
+            if (isAttackActive &&
+                i >= N/2 - N/10 && i < N/2 + N/10 &&
+                j >= N/2 - N/10 && j < N/2 + N/10) {
+                localLambda = lambda * 5;
+                localInput = 1.0;
+                if (Math.random() < 0.1) {
+                    localInput += Math.random() * 0.5;
+                }
+            }
+            const current = z_temp3[i][j];
+            const ns = current.real * current.real + current.imag * current.imag;
+            const f_real = (localLambda - ns) * current.real - omega * current.imag + coupling_k4[i][j].real + localInput;
+            const f_imag = (localLambda - ns) * current.imag + omega * current.real + coupling_k4[i][j].imag;
+            k4[i][j] = { real: f_real, imag: f_imag };
+        }
+    }
+    
+    // ---- Final RK4 Update ----
+    for (let i = 0; i < N; i++) {
+        for (let j = 0; j < N; j++) {
+            z[i][j].real += dt / 6 * (k1[i][j].real + 2 * k2[i][j].real + 2 * k3[i][j].real + k4[i][j].real);
+            z[i][j].imag += dt / 6 * (k1[i][j].imag + 2 * k2[i][j].imag + 2 * k3[i][j].imag + k4[i][j].imag);
         }
     }
 }
@@ -168,15 +252,15 @@ function draw() {
                     break;
                     
                 case 'amplitude':
-                    // Much more aggressive amplitude scaling for high coupling regimes
-                    const logScale = Math.log1p(amplitude * 3) / Math.log1p(3);
-                    const normalizedAmp = Math.min(logScale, 1.0);
+                    // Conservative range that accounts for attacks
+                    const minAmp = 0;  // Include zero for complete suppression
+                    const maxAmp = 1.0;  // Cover attack amplitudes plus some headroom
                     
-                    // Enhanced color mapping with better midrange resolution
+                    const normalizedAmp = Math.min(amplitude / maxAmp, 1.0);
+                    
                     if (amplitude < 0.01) {
                         fillStyle = 'rgb(50, 50, 50)'; // Very low = grey
                     } else {
-                        // Three-color gradient: grey -> blue -> red
                         const r = Math.floor(255 * Math.pow(normalizedAmp, 0.7));
                         const g = Math.floor(255 * 0.3 * (1 - normalizedAmp));
                         const b = Math.floor(255 * (normalizedAmp < 0.5 ? 
@@ -241,12 +325,12 @@ function computeDissonance() {
 
 // Add DN parameters
 let a = 1.0;  // activation amplitude
-let b = 20.0; // activation constant
+let b = 0.0; // activation constant
 let c = 1.0;  // normalization amplitude
 let d = 40.0; // normalization constant
 
 // Compute coupling with flexible kernels and DN terms
-function computeFlexibleCoupling(z, couplingStrengths) {
+function computeFlexibleCouplingDN(z, couplingStrengths) {
     const result = Array(N).fill().map(() => 
         Array(N).fill().map(() => ({ real: 0, imag: 0 }))
     );
@@ -291,7 +375,7 @@ function computeFlexibleCoupling(z, couplingStrengths) {
         for (let j = 0; j < N; j++) {
             // Compute DN ratio
             const numerator = a * activationField[i][j] + b;
-            const denominator = c * normalizationField[i][j] + d;
+            const denominator = 1 // c * normalizationField[i][j] + d;
             const dnFactor = numerator / denominator;
             
             // Preserve phase from original oscillator
@@ -309,6 +393,70 @@ function computeFlexibleCoupling(z, couplingStrengths) {
         }
     }
     
+    return result;
+}
+
+function computeFlexibleCoupling(z, couplingStrengths) {
+    // Initialize result and weight arrays for each cell
+    const result = Array.from({ length: N }, () =>
+        Array.from({ length: N }, () => ({ real: 0, imag: 0 }))
+    );
+    const totalWeight = Array.from({ length: N }, () =>
+        Array.from({ length: N }, () => 0)
+    );
+
+    // Sum contributions from all kernels (without per-kernel normalization)
+    Object.entries(kernels).forEach(([distance, kernel], idx) => {
+        const K = couplingStrengths[idx];
+        const size = kernel.length;
+        const offset = Math.floor(size / 2);
+
+        for (let i = 0; i < N; i++) {
+            for (let j = 0; j < N; j++) {
+                for (let ki = 0; ki < size; ki++) {
+                    for (let kj = 0; kj < size; kj++) {
+                        const ni = (i + ki - offset + N) % N;
+                        const nj = (j + kj - offset + N) % N;
+                        if (kernel[ki][kj] !== 0) {
+                            result[i][j].real += K * kernel[ki][kj] * z[ni][nj].real;
+                            result[i][j].imag += K * kernel[ki][kj] * z[ni][nj].imag;
+                            // Accumulate the absolute weight (you can choose a different scheme if desired)
+                            totalWeight[i][j] += Math.abs(K * kernel[ki][kj]);
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    // Global normalization: divide the summed contribution by the total weight
+    for (let i = 0; i < N; i++) {
+        for (let j = 0; j < N; j++) {
+            if (totalWeight[i][j] > 0) {
+                result[i][j].real /= totalWeight[i][j];
+                result[i][j].imag /= totalWeight[i][j];
+            }
+        }
+    }
+
+    // Add the small world coupling as before
+    for (let i = 0; i < N; i++) {
+        for (let j = 0; j < N; j++) {
+            const numSmallWorld = smallWorldNeighbors[i][j].length;
+            if (numSmallWorld > 0) {
+                let swReal = 0, swImag = 0;
+                for (const neighbor of smallWorldNeighbors[i][j]) {
+                    const ni = neighbor.row;
+                    const nj = neighbor.col;
+                    swReal += (z[ni][nj].real - z[i][j].real);
+                    swImag += (z[ni][nj].imag - z[i][j].imag);
+                }
+                result[i][j].real += smallWorldCoupling * (swReal / numSmallWorld);
+                result[i][j].imag += smallWorldCoupling * (swImag / numSmallWorld);
+            }
+        }
+    }
+
     return result;
 }
 
@@ -365,7 +513,7 @@ document.getElementById('vizMode').addEventListener('change', (e) => {
 });
 
 // DN Parameter Controls
-document.getElementById('activationAmp').addEventListener('input', (e) => {
+/* document.getElementById('activationAmp').addEventListener('input', (e) => {
     a = parseFloat(e.target.value);
     document.getElementById('activationAmpValue').textContent = a.toFixed(1);
 });
@@ -383,7 +531,7 @@ document.getElementById('normAmp').addEventListener('input', (e) => {
 document.getElementById('normConst').addEventListener('input', (e) => {
     d = parseFloat(e.target.value);
     document.getElementById('normConstValue').textContent = d.toFixed(1);
-});
+}); */
 
 document.getElementById('triggerAttack').addEventListener('click', () => {
     isAttackActive = !isAttackActive;
