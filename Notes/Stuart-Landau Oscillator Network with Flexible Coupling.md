@@ -25,7 +25,9 @@ The model implements a flexible coupling scheme where oscillators can interact a
 2. Each kernel has an independently adjustable coupling strength (K₁, K₂, K₃)
 
 3. Coupling influence is computed through convolution with these kernels:
+ 
 $$  coupling = Σᵢ Kᵢ * (kernel_i ⊗ z) $$
+
    where ⊗ represents convolution
 
 ### Cluster Headache Attack Simulation
@@ -75,9 +77,7 @@ The model includes a mechanism to simulate localized pathological activity:
 
 The system uses Euler integration with a small time step (dt = 0.05):
 
-
 $$ z(t + dt) = z(t) + dz/dt * dt $$
-
 
 where dz/dt includes:
 - Linear growth term (λz)

@@ -57,9 +57,9 @@ Here's how I've combined them:
    - Preserves the phase information when converting back to complex
 
 The key equation is:
-```
-dz/dt = (λ + iω - |z|²)z + [aG₁ ⊗ |z| + b]e^(iθ)
-```
+
+$$ dz/dt = (λ + iω - |z|²)z + [aG₁ ⊗ |z| + b]e^(iθ) $$
+
 where θ is the original phase of z at each point.
 
 The main design choices were:
@@ -104,14 +104,10 @@ The key insight is that the DN term provides a way for each oscillator to be inf
 Let me help analyze this potential integration of the DN denominator into the Stuart-Landau (SL) model. Looking at the documents, I see the core equations we're working with:
 
 Current key equation (from the md file):
-```
-dz/dt = (λ + iω - |z|²)z + [aG₁ ⊗ |z| + b]e^(iθ)
-```
+$$ dz/dt = (λ + iω - |z|²)z + [aG₁ ⊗ |z| + b]e^(iθ) $$
 
 DN model's form (from Aqil's paper):
-```
-Response = (aG₁ ⊗ S + b)/(cG₂ ⊗ S + d)
-```
+$$ Response = (aG₁ ⊗ S + b)/(cG₂ ⊗ S + d) $$
 
 Adding the denominator isn't as straightforward as it might seem, because:
 
@@ -120,9 +116,7 @@ Adding the denominator isn't as straightforward as it might seem, because:
 
 However, I think we could potentially integrate them by modifying the coupling term. Instead of just adding $[aG₁ ⊗ |z| + b]$, we could make it:
 
-```
-dz/dt = (λ + iω - |z|²)z + [(aG₁ ⊗ |z| + b)/(cG₂ ⊗ |z| + d)]e^(iθ)
-```
+$$ dz/dt = (λ + iω - |z|²)z + [(aG₁ ⊗ |z| + b)/(cG₂ ⊗ |z| + d)]e^(iθ) $$
 
 This would preserve:
 - The basic SL limit cycle dynamics through (λ + iω - |z|²)z
