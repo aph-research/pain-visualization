@@ -1,10 +1,11 @@
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
+const FIXED_MAX_AMP = 3.5;
 
 // Grid parameters
-let N = 100;  // Reduced grid size for performance
+let N = 100;
 let cellSize;
-const dt = 0.2;  // Larger time step for performance
+const dt = 0.05;
 
 // Use RK4 integration for stability with larger time step
 function rk4Step(x, y, dt, f) {
@@ -36,14 +37,16 @@ function resizeCanvas() {
 }
 
 // Control parameters
-let lambda = 0.1;  // Base excitability
+let lambda = 0.01;  // Base excitability
 let vizMode = 'both'; // Visualization mode
-let omega = 0.15;  // Natural frequency
+let omega = 1.0;  // Natural frequency
 let coupling1 = 0.2;
-let coupling2 = 0.1;
-let coupling3 = 0.05;
-let smallWorldCoupling = 0;
+let coupling2 = 0.0;
+let coupling3 = 0.0;
+let smallWorldCoupling = 0.0;
 let isAttackActive = false;
+let persistentLambdaMap = null; // Will store persistent lambda values 
+let persistenceRate = 0.999;     // Controls how quickly persistent effects decay
 
 // Complex field z and small world connections
 let z;
@@ -72,6 +75,10 @@ function initializeGrid() {
             return connections;
         })
     );
+}
+
+function initializePersistenceMap() {
+    persistentLambdaMap = Array(N).fill().map(() => Array(N).fill(0));
 }
 
 // Define coupling kernels for different distances
@@ -105,34 +112,81 @@ function createGridArray() {
     );
 }
 
+function getLocalParams(i, j) {
+    // Default values
+    let localLambda = lambda;
+    let localInput = 0;
+    
+    // Check if this cell is in the attack region
+    if (isAttackActive &&
+        i >= N/2 - N/10 && i < N/2 + N/10 &&
+        j >= N/2 - N/10 && j < N/2 + N/10) {
+        
+        // Active attack - store the heightened lambda value for persistence
+        const attackLambda = lambda * 10;
+        persistentLambdaMap[i][j] = Math.max(persistentLambdaMap[i][j], attackLambda - lambda);
+        
+        localLambda = attackLambda;
+        localInput = 3.0;
+        
+        if (Math.random() < 0.1) {
+            localInput += Math.random() * 0.5;
+        }
+    } else {
+        // Not in active attack, but apply any persistent effects
+        localLambda = lambda + persistentLambdaMap[i][j];
+    }
+    
+    return { localLambda, localInput };
+}
+
+// This is the derivative function for the Stuart-Landau oscillator
+function computeDerivative(z_real, z_imag, localLambda, localOmega, couplingTerm_real, couplingTerm_imag, localInput) {
+    const ns = z_real * z_real + z_imag * z_imag;
+    return {
+        real: (localLambda - ns) * z_real - localOmega * z_imag + couplingTerm_real + localInput,
+        imag: (localLambda - ns) * z_imag + localOmega * z_real + couplingTerm_imag
+    };
+}
+
+function updatePersistence() {
+    // Gradually decay the persistent effects
+    for (let i = 0; i < N; i++) {
+        for (let j = 0; j < N; j++) {
+            if (persistentLambdaMap[i][j] > 0.01) {
+                persistentLambdaMap[i][j] *= persistenceRate;
+            } else {
+                persistentLambdaMap[i][j] = 0;
+            }
+        }
+    }
+}
+
 function update() {
     // We'll perform a full-grid RK4 update where we recompute the coupling field at each sub-step.
-    // dt is our time step.
     
     // ---- k1 Step ----
     const coupling_k1 = computeFlexibleCoupling(z, [coupling1, coupling2, coupling3]);
     const k1 = createGridArray();
     const z_temp1 = createGridArray(); // will hold z + (dt/2)*k1
+    
     for (let i = 0; i < N; i++) {
         for (let j = 0; j < N; j++) {
-            // Local parameters (attack simulation remains unchanged)
-            let localLambda = lambda;
-            let localInput = 0;
-            if (isAttackActive &&
-                i >= N/2 - N/10 && i < N/2 + N/10 &&
-                j >= N/2 - N/10 && j < N/2 + N/10) {
-                localLambda = lambda * 5;
-                localInput = 1.0;
-                if (Math.random() < 0.1) {
-                    localInput += Math.random() * 0.5;
-                }
-            }
+            const { localLambda, localInput } = getLocalParams(i, j);
             const current = z[i][j];
-            const ns = current.real * current.real + current.imag * current.imag;
-            const f_real = (localLambda - ns) * current.real - omega * current.imag + coupling_k1[i][j].real + localInput;
-            const f_imag = (localLambda - ns) * current.imag + omega * current.real + coupling_k1[i][j].imag;
-            k1[i][j] = { real: f_real, imag: f_imag };
-            z_temp1[i][j] = { real: current.real + (dt/2) * f_real, imag: current.imag + (dt/2) * f_imag };
+            
+            const derivative = computeDerivative(
+                current.real, current.imag, 
+                localLambda, omega, 
+                coupling_k1[i][j].real, coupling_k1[i][j].imag, 
+                localInput
+            );
+            
+            k1[i][j] = { real: derivative.real, imag: derivative.imag };
+            z_temp1[i][j] = { 
+                real: current.real + (dt/2) * derivative.real, 
+                imag: current.imag + (dt/2) * derivative.imag 
+            };
         }
     }
     
@@ -140,27 +194,26 @@ function update() {
     const coupling_k2 = computeFlexibleCoupling(z_temp1, [coupling1, coupling2, coupling3]);
     const k2 = createGridArray();
     const z_temp2 = createGridArray(); // will hold z + (dt/2)*k2 (using original z)
+    
     for (let i = 0; i < N; i++) {
         for (let j = 0; j < N; j++) {
-            let localLambda = lambda;
-            let localInput = 0;
-            if (isAttackActive &&
-                i >= N/2 - N/10 && i < N/2 + N/10 &&
-                j >= N/2 - N/10 && j < N/2 + N/10) {
-                localLambda = lambda * 5;
-                localInput = 1.0;
-                if (Math.random() < 0.1) {
-                    localInput += Math.random() * 0.5;
-                }
-            }
+            const { localLambda, localInput } = getLocalParams(i, j);
             const current = z_temp1[i][j];
-            const ns = current.real * current.real + current.imag * current.imag;
-            const f_real = (localLambda - ns) * current.real - omega * current.imag + coupling_k2[i][j].real + localInput;
-            const f_imag = (localLambda - ns) * current.imag + omega * current.real + coupling_k2[i][j].imag;
-            k2[i][j] = { real: f_real, imag: f_imag };
+            
+            const derivative = computeDerivative(
+                current.real, current.imag, 
+                localLambda, omega, 
+                coupling_k2[i][j].real, coupling_k2[i][j].imag, 
+                localInput
+            );
+            
+            k2[i][j] = { real: derivative.real, imag: derivative.imag };
             // For k2, we use the original z for the update: z_temp2 = z + (dt/2)*k2
             const orig = z[i][j];
-            z_temp2[i][j] = { real: orig.real + (dt/2) * f_real, imag: orig.imag + (dt/2) * f_imag };
+            z_temp2[i][j] = { 
+                real: orig.real + (dt/2) * derivative.real, 
+                imag: orig.imag + (dt/2) * derivative.imag 
+            };
         }
     }
     
@@ -168,50 +221,45 @@ function update() {
     const coupling_k3 = computeFlexibleCoupling(z_temp2, [coupling1, coupling2, coupling3]);
     const k3 = createGridArray();
     const z_temp3 = createGridArray(); // will hold z + dt*k3 (using original z)
+    
     for (let i = 0; i < N; i++) {
         for (let j = 0; j < N; j++) {
-            let localLambda = lambda;
-            let localInput = 0;
-            if (isAttackActive &&
-                i >= N/2 - N/10 && i < N/2 + N/10 &&
-                j >= N/2 - N/10 && j < N/2 + N/10) {
-                localLambda = lambda * 5;
-                localInput = 1.0;
-                if (Math.random() < 0.1) {
-                    localInput += Math.random() * 0.5;
-                }
-            }
+            const { localLambda, localInput } = getLocalParams(i, j);
             const current = z_temp2[i][j];
-            const ns = current.real * current.real + current.imag * current.imag;
-            const f_real = (localLambda - ns) * current.real - omega * current.imag + coupling_k3[i][j].real + localInput;
-            const f_imag = (localLambda - ns) * current.imag + omega * current.real + coupling_k3[i][j].imag;
-            k3[i][j] = { real: f_real, imag: f_imag };
+            
+            const derivative = computeDerivative(
+                current.real, current.imag, 
+                localLambda, omega, 
+                coupling_k3[i][j].real, coupling_k3[i][j].imag, 
+                localInput
+            );
+            
+            k3[i][j] = { real: derivative.real, imag: derivative.imag };
             const orig = z[i][j];
-            z_temp3[i][j] = { real: orig.real + dt * f_real, imag: orig.imag + dt * f_imag };
+            z_temp3[i][j] = { 
+                real: orig.real + dt * derivative.real, 
+                imag: orig.imag + dt * derivative.imag 
+            };
         }
     }
     
     // ---- k4 Step ----
     const coupling_k4 = computeFlexibleCoupling(z_temp3, [coupling1, coupling2, coupling3]);
     const k4 = createGridArray();
+    
     for (let i = 0; i < N; i++) {
         for (let j = 0; j < N; j++) {
-            let localLambda = lambda;
-            let localInput = 0;
-            if (isAttackActive &&
-                i >= N/2 - N/10 && i < N/2 + N/10 &&
-                j >= N/2 - N/10 && j < N/2 + N/10) {
-                localLambda = lambda * 5;
-                localInput = 1.0;
-                if (Math.random() < 0.1) {
-                    localInput += Math.random() * 0.5;
-                }
-            }
+            const { localLambda, localInput } = getLocalParams(i, j);
             const current = z_temp3[i][j];
-            const ns = current.real * current.real + current.imag * current.imag;
-            const f_real = (localLambda - ns) * current.real - omega * current.imag + coupling_k4[i][j].real + localInput;
-            const f_imag = (localLambda - ns) * current.imag + omega * current.real + coupling_k4[i][j].imag;
-            k4[i][j] = { real: f_real, imag: f_imag };
+            
+            const derivative = computeDerivative(
+                current.real, current.imag, 
+                localLambda, omega, 
+                coupling_k4[i][j].real, coupling_k4[i][j].imag, 
+                localInput
+            );
+            
+            k4[i][j] = { real: derivative.real, imag: derivative.imag };
         }
     }
     
@@ -222,11 +270,45 @@ function update() {
             z[i][j].imag += dt / 6 * (k1[i][j].imag + 2 * k2[i][j].imag + 2 * k3[i][j].imag + k4[i][j].imag);
         }
     }
+    updatePersistence();
 }
+
+let selectedColormap = 'viridis';
 
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
+    // Still calculate statistics for display purposes
+    let minAmp = Infinity;
+    let maxAmp = -Infinity;
+    let ampSum = 0;
+    let ampCount = 0;
+    
+    // First pass to calculate statistics only (for the histogram and stats display)
+    for (let i = 0; i < N; i++) {
+        for (let j = 0; j < N; j++) {
+            const amplitude = Math.sqrt(
+                z[i][j].real * z[i][j].real + 
+                z[i][j].imag * z[i][j].imag
+            );
+            
+            if (amplitude > 0.01) { // Filter out very small values
+                minAmp = Math.min(minAmp, amplitude);
+                maxAmp = Math.max(maxAmp, amplitude);
+                ampSum += amplitude;
+                ampCount++;
+            }
+        }
+    }
+    
+    // Safety check
+    if (minAmp === Infinity) minAmp = 0;
+    if (maxAmp === -Infinity) maxAmp = 1;
+    
+    // Calculate average
+    const avgAmp = ampCount > 0 ? ampSum / ampCount : 0;
+    
+    // Visualization pass
     for (let i = 0; i < N; i++) {
         for (let j = 0; j < N; j++) {
             const amplitude = Math.sqrt(
@@ -238,7 +320,7 @@ function draw() {
             let fillStyle;
             switch(vizMode) {
                 case 'both':
-                    // Original visualization
+                    // Combined phase & amplitude
                     const hue = ((phase / (2 * Math.PI)) + 0.5) * 360;
                     const saturation = 80;
                     const lightness = Math.min(amplitude * 50, 80);
@@ -252,21 +334,15 @@ function draw() {
                     break;
                     
                 case 'amplitude':
-                    // Conservative range that accounts for attacks
-                    const minAmp = 0;  // Include zero for complete suppression
-                    const maxAmp = 1.0;  // Cover attack amplitudes plus some headroom
-                    
-                    const normalizedAmp = Math.min(amplitude / maxAmp, 1.0);
-                    
                     if (amplitude < 0.01) {
                         fillStyle = 'rgb(50, 50, 50)'; // Very low = grey
                     } else {
-                        const r = Math.floor(255 * Math.pow(normalizedAmp, 0.7));
-                        const g = Math.floor(255 * 0.3 * (1 - normalizedAmp));
-                        const b = Math.floor(255 * (normalizedAmp < 0.5 ? 
-                            0.5 + normalizedAmp : 
-                            1 - normalizedAmp));
-                        fillStyle = `rgb(${r}, ${g}, ${b})`;
+                        // Use fixed maximum instead of calculated maxAmp
+                        let normalizedAmp = amplitude / FIXED_MAX_AMP;
+                        normalizedAmp = Math.max(0, Math.min(1, normalizedAmp)); // Clamp to [0,1]
+                        
+                        // Use the selected colormap
+                        fillStyle = getColorFromMap(normalizedAmp, selectedColormap);
                     }
                     break;
             }
@@ -321,79 +397,6 @@ function computeDissonance() {
         }
     }
     return count > 0 ? totalDissonance / count : 0;
-}
-
-// Add DN parameters
-let a = 1.0;  // activation amplitude
-let b = 0.0; // activation constant
-let c = 1.0;  // normalization amplitude
-let d = 40.0; // normalization constant
-
-// Compute coupling with flexible kernels and DN terms
-function computeFlexibleCouplingDN(z, couplingStrengths) {
-    const result = Array(N).fill().map(() => 
-        Array(N).fill().map(() => ({ real: 0, imag: 0 }))
-    );
-    
-    // First compute amplitude field
-    const amplitudes = Array(N).fill().map((_, i) => 
-        Array(N).fill().map((_, j) => 
-            Math.sqrt(z[i][j].real * z[i][j].real + z[i][j].imag * z[i][j].imag)
-        )
-    );
-    
-    // Compute activation (G₁) and normalization (G₂) terms using your discrete kernels
-    const activationField = Array(N).fill().map(() => Array(N).fill(0));
-    const normalizationField = Array(N).fill().map(() => Array(N).fill(0));
-    
-    // Apply kernels with different coupling strengths for activation (G₁)
-    Object.entries(kernels).forEach(([distance, kernel], idx) => {
-        const K = couplingStrengths[idx];
-        const size = kernel.length;
-        const offset = Math.floor(size / 2);
-        
-        for (let i = 0; i < N; i++) {
-            for (let j = 0; j < N; j++) {
-                for (let ki = 0; ki < size; ki++) {
-                    for (let kj = 0; kj < size; kj++) {
-                        const ni = (i + ki - offset + N) % N;
-                        const nj = (j + kj - offset + N) % N;
-                        
-                        if (kernel[ki][kj] !== 0) {
-                            activationField[i][j] += K * kernel[ki][kj] * amplitudes[ni][nj];
-                            // Use a different spread for normalization field (G₂)
-                            normalizationField[i][j] += (K * 1.5) * kernel[ki][kj] * amplitudes[ni][nj];
-                        }
-                    }
-                }
-            }
-        }
-    });
-    
-    // Compute final coupling term including DN and small world
-    for (let i = 0; i < N; i++) {
-        for (let j = 0; j < N; j++) {
-            // Compute DN ratio
-            const numerator = a * activationField[i][j] + b;
-            const denominator = 1 // c * normalizationField[i][j] + d;
-            const dnFactor = numerator / denominator;
-            
-            // Preserve phase from original oscillator
-            const phase = Math.atan2(z[i][j].imag, z[i][j].real);
-            result[i][j].real = dnFactor * Math.cos(phase);
-            result[i][j].imag = dnFactor * Math.sin(phase);
-            
-            // Add small world coupling
-            for (const neighbor of smallWorldNeighbors[i][j]) {
-                const ni = neighbor.row;
-                const nj = neighbor.col;
-                result[i][j].real += smallWorldCoupling * (z[ni][nj].real - z[i][j].real);
-                result[i][j].imag += smallWorldCoupling * (z[ni][nj].imag - z[i][j].imag);
-            }
-        }
-    }
-    
-    return result;
 }
 
 function computeFlexibleCoupling(z, couplingStrengths) {
@@ -464,7 +467,15 @@ function computeFlexibleCoupling(z, couplingStrengths) {
 function animate() {
     update();
     draw();
-
+    
+    // Update amplitude histogram every few frames for performance
+    if (window.frameCount === undefined) window.frameCount = 0;
+    window.frameCount++;
+    
+    if (window.frameCount % 10 === 0) { // Update every 10 frames
+        updateAmplitudeHistogram();
+    }
+    
     // Compute dissonance measure
     const dissonance = computeDissonance();
     // Update the HTML element with id "dissonanceValue"
@@ -512,46 +523,111 @@ document.getElementById('vizMode').addEventListener('change', (e) => {
     vizMode = e.target.value;
 });
 
-// DN Parameter Controls
-/* document.getElementById('activationAmp').addEventListener('input', (e) => {
-    a = parseFloat(e.target.value);
-    document.getElementById('activationAmpValue').textContent = a.toFixed(1);
+document.getElementById('colormap').addEventListener('change', (e) => {
+    selectedColormap = e.target.value;
 });
-
-document.getElementById('activationConst').addEventListener('input', (e) => {
-    b = parseFloat(e.target.value);
-    document.getElementById('activationConstValue').textContent = b.toFixed(1);
-});
-
-document.getElementById('normAmp').addEventListener('input', (e) => {
-    c = parseFloat(e.target.value);
-    document.getElementById('normAmpValue').textContent = c.toFixed(1);
-});
-
-document.getElementById('normConst').addEventListener('input', (e) => {
-    d = parseFloat(e.target.value);
-    document.getElementById('normConstValue').textContent = d.toFixed(1);
-}); */
 
 document.getElementById('triggerAttack').addEventListener('click', () => {
     isAttackActive = !isAttackActive;
     const button = document.getElementById('triggerAttack');
     button.textContent = isAttackActive ? 'Stop Attack' : 'Trigger Attack';
     button.style.backgroundColor = isAttackActive ? '#f44336' : '#4CAF50';
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+    setupAmplitudeMonitor();
+});
+
+function setupAmplitudeMonitor() {
+    const histogramContainer = document.querySelector('.histogram-container');
+    if (!histogramContainer) return; // Exit if container not found
     
-    if (isAttackActive) {
-        for (let i = N/2 - N/10; i < N/2 + N/10; i++) {
-            for (let j = N/2 - N/10; j < N/2 + N/10; j++) {
-                z[i][j].real += 0.5 * (Math.random() - 0.5);
-                z[i][j].imag += 0.5 * (Math.random() - 0.5);
+    // Clear any existing bars
+    histogramContainer.innerHTML = '';
+    
+    // Create histogram bars
+    const NUM_BINS = 20;
+    window.histogramBars = []; // Store reference globally
+    
+    for (let i = 0; i < NUM_BINS; i++) {
+        const bar = document.createElement('div');
+        bar.style.position = 'absolute';
+        bar.style.bottom = '0';
+        bar.style.width = `${100/NUM_BINS}%`;
+        bar.style.left = `${i * (100/NUM_BINS)}%`;
+        bar.style.height = '0px';
+        bar.style.backgroundColor = getHistogramColor(i/NUM_BINS);
+        bar.style.transition = 'height 0.3s ease';
+        histogramContainer.appendChild(bar);
+        window.histogramBars.push(bar);
+    }
+}
+
+// Get color for histogram bars (simplified colormap)
+function getHistogramColor(t) {
+    return getColorFromMap(t, 'viridis');
+}
+
+// Update the histogram with current amplitude data
+function updateAmplitudeHistogram() {
+    if (!window.histogramBars || window.histogramBars.length === 0) return;
+    
+    // Collect all amplitude values
+    const amplitudes = [];
+    for (let i = 0; i < N; i++) {
+        for (let j = 0; j < N; j++) {
+            const amplitude = Math.sqrt(
+                z[i][j].real * z[i][j].real + 
+                z[i][j].imag * z[i][j].imag
+            );
+            if (amplitude > 0.001) { // Filter out near-zero values
+                amplitudes.push(amplitude);
             }
         }
     }
-});
+    
+    if (amplitudes.length === 0) return;
+    
+    // Calculate statistics
+    let min = Math.min(...amplitudes);
+    let max = Math.max(...amplitudes);
+    let avg = amplitudes.reduce((sum, val) => sum + val, 0) / amplitudes.length;
+    
+    // Update stats display
+    document.getElementById('minAmp').textContent = min.toFixed(3);
+    document.getElementById('avgAmp').textContent = avg.toFixed(3);
+    document.getElementById('maxAmp').textContent = max.toFixed(3);
+    
+    // Create histogram
+    const NUM_BINS = window.histogramBars.length;
+    const bins = Array(NUM_BINS).fill(0);
+    const binSize = (max - min) / NUM_BINS;
+    
+    if (binSize === 0) return; // Avoid division by zero
+    
+    // Count values in each bin
+    amplitudes.forEach(amp => {
+        const binIndex = Math.min(NUM_BINS - 1, Math.floor((amp - min) / binSize));
+        bins[binIndex]++;
+    });
+    
+    // Find the maximum bin count for normalization
+    const maxBinCount = Math.max(...bins);
+    
+    // Update histogram bars
+    for (let i = 0; i < NUM_BINS; i++) {
+        const heightPercentage = maxBinCount > 0 ? (bins[i] / maxBinCount) * 100 : 0;
+        window.histogramBars[i].style.height = `${heightPercentage}%`;
+    }
+    
+    // Also log to console for debugging
+    console.log(`Amplitude stats - Min: ${min.toFixed(3)}, Max: ${max.toFixed(3)}, Avg: ${avg.toFixed(3)}`);
+}
 
 // Handle window resizing
 window.addEventListener('resize', resizeCanvas);
 
 // Initial setup
+initializePersistenceMap();
 resizeCanvas();
 animate();
