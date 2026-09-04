@@ -1,0 +1,61 @@
+{
+  "experiment": "4 - consonant vs dissonant entrainment",
+  "harmonic_stack_hz": [
+    1.0,
+    2.0,
+    4.0,
+    6.0,
+    8.0,
+    12.0
+  ],
+  "dissonant_stack_hz": [
+    1.01,
+    2.01,
+    3.98,
+    6.02,
+    7.99,
+    12.03
+  ],
+  "inharmonic_stack_hz": [
+    1.0,
+    1.618,
+    2.618,
+    4.2361,
+    6.8541,
+    11.0902
+  ],
+  "baseline_D": 0.20579815811914617,
+  "curves": {
+    "harmonic": [
+      0.19770520272227396,
+      0.2118171778932619,
+      0.2071053336166048,
+      0.21371558200304755,
+      0.2797614028489868
+    ],
+    "dissonant": [
+      0.19770520272227396,
+      0.21053816368345177,
+      0.2167716451138091,
+      0.21100029567629805,
+      0.2611804113853268
+    ],
+    "inharmonic": [
+      0.19770520272227396,
+      0.20857197862649093,
+      0.19563925461267717,
+      0.2202504541090821,
+      0.22612799201045375
+    ]
+  },
+  "effect_harmonic": 0.07396324472984064,
+  "effect_dissonant": 0.05538225326618065,
+  "effect_inharmonic": 0.020329833891307575,
+  "seed_spread": 0.03738068798300943,
+  "supports_stv_prediction": false,
+  "positive_control_separates": false,
+  "verdict": "At the strongest stimulation, the consonant stack changes D by +0.0740, the source's matched dissonant stack by +0.0554, and a grossly inharmonic golden-ratio stack by +0.0203 (seed spread ~0.0374). Consonant and dissonant stimulation are NOT meaningfully separated, so the one prediction unique to STV rather than to generic desynchronisation does not reproduce here. The grossly inharmonic control does not separate either, so the null is about the entrainment mechanism itself, not about the fineness of the source's mistuning: driving a peripheral branch simply does not move this metric whatever its consonance. That is the stronger negative result of the two.",
+  "figures": [
+    "/Users/alfredoparra/Documents/GitHub/pain-visualization/cluster-headache/results/exp4_entrainment/entrainment.png"
+  ]
+}

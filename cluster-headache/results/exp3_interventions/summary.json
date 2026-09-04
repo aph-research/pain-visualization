@@ -1,0 +1,126 @@
+{
+  "experiment": "3 - the three interventions",
+  "attack_amplitude": 4.0,
+  "t_intervene": 25.0,
+  "duration": 12.0,
+  "effects": {
+    "none": {
+      "relative_change": 0.0021169189271717007,
+      "latency_to_half_s": NaN
+    },
+    "DMT (transient Mexican-hat)": {
+      "relative_change": -0.5144780525149671,
+      "latency_to_half_s": 2.0
+    },
+    "5-MeO (transient uniform-positive)": {
+      "relative_change": -0.01747332129026503,
+      "latency_to_half_s": NaN
+    },
+    "oxygen (sigma_omega x0.25)": {
+      "relative_change": -0.06593342179507479,
+      "latency_to_half_s": 4.5
+    },
+    "sumatriptan (peripheral gain x0.4)": {
+      "relative_change": -0.13071068993615767,
+      "latency_to_half_s": NaN
+    }
+  },
+  "kernel_thresholds": {
+    "baseline": 2.326033803614235,
+    "retuned": 1.3558775890691936,
+    "5meo_plate": 2.206936050085113,
+    "mexican_hat": 4.822704779986468,
+    "flat": 0.0
+  },
+  "kernel_peak_ratio": {
+    "baseline": 1.0,
+    "retuned": 1.012754514889958,
+    "5meo_plate": 0.9461089641662103,
+    "mexican_hat": 0.5152487157389428,
+    "flat": 1.451609155461456
+  },
+  "onset_level": 0.11414543697868053,
+  "kernel_curves": {
+    "baseline": [
+      0.04746457245259093,
+      0.08031207015567016,
+      0.18408464357582444,
+      0.22829087395736106,
+      0.08700704955185988,
+      0.02947869711863695,
+      0.0021832980734639326
+    ],
+    "retuned": [
+      0.10455348609377241,
+      0.1315064361516732,
+      0.2312026133084917,
+      0.22986342802477808,
+      0.019295675111307784,
+      0.00302118368826563,
+      0.0022194123348675794
+    ],
+    "5meo_plate": [
+      0.05066228955910549,
+      0.08757140536946183,
+      0.21598804228839774,
+      0.1838285771395103,
+      0.07369739349765028,
+      0.01659949582986323,
+      0.002238400125122698
+    ],
+    "mexican_hat": [
+      0.009690310410184857,
+      0.03776627143866403,
+      0.0812441766438419,
+      0.09799185600902138,
+      0.11762657962145116,
+      0.10002497098721726,
+      0.061812456678402794
+    ],
+    "flat": [
+      0.3313891227448026,
+      0.23565991639197312,
+      0.25080476351719105,
+      0.12477375197180023,
+      0.012359878482823274,
+      0.0026778770048904127,
+      0.0021485758760741917
+    ]
+  },
+  "threshold_amplitudes": [
+    1.0,
+    2.0,
+    3.0,
+    4.0,
+    5.0,
+    6.0,
+    8.0
+  ],
+  "oxygen_factors": [
+    0.1,
+    0.25,
+    0.5,
+    0.75,
+    1.0
+  ],
+  "oxygen_curve": [
+    0.09978778060696118,
+    0.15244777317296185,
+    0.2012227592948329,
+    0.20068051588716154,
+    0.22829087395736106
+  ],
+  "oxygen_monotone": true,
+  "oxygen_direction": "reduces",
+  "oxygen_span": 0.5628919418583548,
+  "series": [
+    "/Users/alfredoparra/Documents/GitHub/pain-visualization/cluster-headache/results/series/exp3_control.npz",
+    "/Users/alfredoparra/Documents/GitHub/pain-visualization/cluster-headache/results/series/exp3_dmt.npz"
+  ],
+  "verdict": "Change in D during the intervention, relative to the untreated arm on the same seeds: DMT (Mexican-hat) -52% (+/-8%), 5-MeO (uniform-positive) -2% (+/-9%, within seed noise), oxygen -7% (+/-14%, within seed noise), sumatriptan -13% (+/-8%, within seed noise). Across the full oxygen sweep the response is monotone and contracting sigma_omega reduces dissonance: D = 0.1->0.100, 0.25->0.152, 0.5->0.201, 0.75->0.201, 1->0.228, a 56% reduction at the strongest contraction. That is the direction VI.2 proposes - stabilising the natural frequencies widens the basin of the consonant state - though note VI.2 offers it as a role assignment, not a derivation, and the model was not built to test it. The DMT/5-MeO ordering matches Model B and the clinical anomaly in IV.1: the complexifier relieves and the symmetriser does not, from kernel shape alone, since the two are energy-matched. Onset is scored as the drive amplitude at which D first reaches half the baseline kernel's peak (0.114); baseline crosses at A = 2.33. Persistent kernel shifts that raise that threshold: mexican_hat (A = 4.82, peak D 0.52x baseline).",
+  "figures": [
+    "/Users/alfredoparra/Documents/GitHub/pain-visualization/cluster-headache/results/exp3_interventions/interventions.png",
+    "/Users/alfredoparra/Documents/GitHub/pain-visualization/cluster-headache/results/exp3_interventions/intervention_effects.png",
+    "/Users/alfredoparra/Documents/GitHub/pain-visualization/cluster-headache/results/exp3_interventions/kernel_threshold.png"
+  ]
+}

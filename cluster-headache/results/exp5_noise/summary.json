@@ -1,0 +1,78 @@
+{
+  "experiment": "5 - noise control and D/LZ dissociation",
+  "pearson_D_LZ": -0.17854446354100986,
+  "spearman_D_LZ": -0.12516469038208167,
+  "within_arm_correlations": {
+    "noise": {
+      "pearson": -0.8528788820001693,
+      "spearman": -0.5199999999999999
+    },
+    "drive": {
+      "pearson": 0.48656924362280946,
+      "spearman": 0.5558441558441559
+    }
+  },
+  "noise_levels": [
+    0.0,
+    0.05,
+    0.15,
+    0.3,
+    0.6,
+    1.0,
+    1.8,
+    3.0
+  ],
+  "D_vs_noise": [
+    0.03158131287682558,
+    0.031551688218968366,
+    0.031905299246316826,
+    0.03379161438799328,
+    0.03385745399611931,
+    0.02873818283968536,
+    0.021617216568883855,
+    0.014667799496238518
+  ],
+  "LZ_vs_noise": [
+    0.26130186812406536,
+    0.25676221694186047,
+    0.27264678965332134,
+    0.30544759437564006,
+    0.3640339725607846,
+    0.43298908705421546,
+    0.5514999930555814,
+    0.6977525902268126
+  ],
+  "drive_levels": [
+    0.0,
+    2.0,
+    3.0,
+    4.0,
+    5.0,
+    6.0,
+    8.0
+  ],
+  "D_vs_drive": [
+    0.031551688218968366,
+    0.08031207015567016,
+    0.18408464357582444,
+    0.22829087395736106,
+    0.08700704955185988,
+    0.02947869711863695,
+    0.0021832980734639326
+  ],
+  "LZ_vs_drive": [
+    0.25676221694186047,
+    0.32066523173743455,
+    0.2950731667241218,
+    0.21278233732273055,
+    0.1147182776447248,
+    0.07271669680712423,
+    0.055288858501551165
+  ],
+  "dissociates": true,
+  "verdict": "Under noise injection LZ rises by +0.44 while D falls by -0.0169 - the asymmetry/antisymmetry distinction behaving exactly as III.1 requires. Pooled across all 45 runs the D-LZ correlation is r = -0.18 (Spearman -0.13); within arms it is -0.85 under noise and +0.49 under drive. Those two carry opposite signs, which is the strongest available form of the result: the same pair of metrics moves together under one manipulation and apart under the other, so no monotone function relates them. The dissonance index is therefore measuring structured incommensurability rather than entropy - prediction 4 in the falsification table, and the precondition for anything else here meaning anything.",
+  "figures": [
+    "/Users/alfredoparra/Documents/GitHub/pain-visualization/cluster-headache/results/exp5_noise/noise_control.png",
+    "/Users/alfredoparra/Documents/GitHub/pain-visualization/cluster-headache/results/exp5_noise/dissociation.png"
+  ]
+}

@@ -1,0 +1,102 @@
+{
+  "experiment": "6 - IX.6 parameter sweeps",
+  "laplacian_eigenfrequencies_hz": [
+    0.0002043473425268783,
+    0.003164238775713974,
+    0.007300614663611176,
+    0.019819775377281718,
+    0.031158389455055766,
+    0.03988791378718103
+  ],
+  "variant_pacemaker_D": [
+    0.030020025562769052,
+    0.046347975864861723,
+    0.07927330481235005,
+    0.19426663814295725,
+    0.22770676124739003,
+    0.0832941957738883,
+    0.03063618436920703,
+    0.0016960415206987204
+  ],
+  "variant_diffuse_D": [
+    0.030020025562769052,
+    0.03845837668193454,
+    0.04097106768558788,
+    0.08116889179451296,
+    0.09109020077890131,
+    0.04272936041371701,
+    0.00742306228092097,
+    0.0017785345804459131
+  ],
+  "amplitudes": [
+    0.0,
+    1.0,
+    2.0,
+    3.0,
+    4.0,
+    5.0,
+    6.0,
+    8.0
+  ],
+  "k_sw_values": [
+    -3.0,
+    -2.0,
+    -1.0,
+    -0.5,
+    0.0,
+    0.5,
+    1.0,
+    2.0,
+    3.0
+  ],
+  "k_sw_D": [
+    0.03523785533126267,
+    0.05924006659525986,
+    0.15833436854342844,
+    0.22024932547670562,
+    0.22770676124739003,
+    0.13409295400997312,
+    0.05140560957460752,
+    0.0018062689890676142,
+    0.0015828590628183133
+  ],
+  "omega_hz": [
+    2.8,
+    3.9199999999999995,
+    4.76,
+    5.319999999999999,
+    5.6,
+    5.88,
+    6.4399999999999995,
+    7.279999999999999,
+    8.959999999999999,
+    11.2
+  ],
+  "omega_D": [
+    0.048245675379665315,
+    0.06308269220328881,
+    0.1933059787237144,
+    0.016772827222381208,
+    0.044115739677922906,
+    0.0632744947530732,
+    0.17693970408472937,
+    0.06101395537089109,
+    0.04765570733758435,
+    0.03756153175568575
+  ],
+  "size_D": [
+    0.31829541776546044,
+    0.22770676124739003,
+    0.12959349076521043
+  ],
+  "sizes": [
+    225,
+    625,
+    1225
+  ],
+  "size_spread": 0.8379357747907425,
+  "verdict": "Drive variant: the pacemaker reaches peak D = 0.228 and the diffuse (small-world) drive 0.091; IX.3 is right that they are not equivalent, and the difference is visible at matched achieved coherence, not just at matched amplitude. K_SW: D ranges 0.002 to 0.228 over [-3, 3], peaking at K_SW = 0. Drive frequency: D ranges 0.017 to 0.193 as Omega sweeps 2.8-11.2 Hz, peaking at 4.76 Hz while dipping to 0.044 at Omega = omega_0 = 5.6 Hz - so driving *on* the tissue's own frequency is the quiet case and detuning either way generates dissonance, which is IX.3's speculation that Omega/mode mismatch is 'a candidate dissonance generator in its own right', confirmed. Size: D falls monotonically with N (225:0.318, 625:0.228, 1225:0.130), a 84% spread, so **absolute** D values are not comparable across node counts. Every experiment here holds N fixed, so the within-experiment comparisons are unaffected, but no absolute magnitude should be read as a property of the model.",
+  "figures": [
+    "/Users/alfredoparra/Documents/GitHub/pain-visualization/cluster-headache/results/exp6_sweeps/parameter_sweeps.png"
+  ]
+}

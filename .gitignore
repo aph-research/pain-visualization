@@ -171,3 +171,7 @@ cython_debug/
 .pypirc
 .DS_Store
 .DS_Store
+
+# cluster-headache simulation: large phase time series (regenerate with `sim.cli exp1 exp3`)
+cluster-headache/results/series/
+.venv/
