@@ -1,0 +1,1013 @@
+<title>Trigeminal Dissonance Explorer</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+
+<style>
+/* A phase field reads best on a dark ground, and this matches the repo's existing
+   Stuart-Landau sims, so the page commits to one visual world. Every colour is painted
+   explicitly rather than inherited. */
+:root {
+  color-scheme: dark;
+  --bg:        #0d0f13;
+  --panel:     #161a21;
+  --panel-2:   #1d222b;
+  --stage:     #090b0e;
+  --rule:      #2a303b;
+  --ink:       #e8eaee;
+  --ink-2:     #a8b0bd;
+  --ink-3:     #6f7887;
+  --accent:    #5b9cf0;
+  --accent-2:  #f0813f;
+  --good:      #35c08a;
+  --warn:      #e0b040;
+  --bad:       #ef6b52;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  font-size: 13.5px; line-height: 1.5; overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+.app { display: grid; grid-template-columns: 316px 1fr; height: 100vh; }
+
+/* ---------------- panel ---------------- */
+.panel {
+  background: var(--panel); border-right: 1px solid var(--rule);
+  overflow-y: auto; padding: 16px 16px 40px;
+}
+.panel::-webkit-scrollbar { width: 9px; }
+.panel::-webkit-scrollbar-thumb { background: #2d3441; border-radius: 5px; }
+h1 {
+  font-size: 15px; font-weight: 600; margin: 0 0 3px; letter-spacing: -.01em;
+}
+.sub { font-size: 11.5px; color: var(--ink-3); margin: 0 0 16px; line-height: 1.45; }
+
+fieldset {
+  border: 1px solid var(--rule); border-radius: 6px; padding: 11px 12px 13px;
+  margin: 0 0 12px; background: var(--panel-2);
+}
+legend {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 10px; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--ink-3); padding: 0 5px;
+}
+.row { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
+.row:last-child { margin-bottom: 0; }
+.row label { flex: 0 0 96px; font-size: 12px; color: var(--ink-2); }
+.row input[type=range] { flex: 1; min-width: 0; accent-color: var(--accent); height: 18px; }
+.row .val {
+  flex: 0 0 46px; text-align: right;
+  font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 11.5px;
+  color: var(--ink); font-variant-numeric: tabular-nums;
+}
+.btnrow { display: flex; flex-wrap: wrap; gap: 5px; }
+button {
+  font: inherit; font-size: 11.5px; color: var(--ink-2);
+  background: #232935; border: 1px solid var(--rule); border-radius: 5px;
+  padding: 5px 9px; cursor: pointer; transition: background .12s, color .12s;
+}
+button:hover { background: #2c3441; color: var(--ink); }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+button.on { background: var(--accent); border-color: var(--accent); color: #06101f; font-weight: 500; }
+button.wide { flex: 1; }
+button.armed { border-color: var(--accent-2); color: var(--accent-2); }
+select {
+  font: inherit; font-size: 12px; color: var(--ink); background: #232935;
+  border: 1px solid var(--rule); border-radius: 5px; padding: 4px 6px; flex: 1; min-width: 0;
+}
+.hint { font-size: 11px; color: var(--ink-3); margin: 7px 0 0; line-height: 1.4; }
+
+/* ---------------- stage ---------------- */
+.stage { position: relative; background: var(--stage); overflow: hidden; }
+#view { display: block; width: 100%; height: 100%; }
+
+.hud {
+  position: absolute; top: 14px; left: 14px; display: flex; gap: 8px; flex-wrap: wrap;
+  pointer-events: none;
+}
+.stat {
+  background: rgba(16,19,25,.86); border: 1px solid var(--rule); border-radius: 6px;
+  padding: 7px 11px 8px; min-width: 92px; backdrop-filter: blur(6px);
+}
+.stat .k {
+  font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 9.5px;
+  letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); display: block;
+}
+.stat .v {
+  font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 19px;
+  font-variant-numeric: tabular-nums; color: var(--ink); display: block; line-height: 1.25;
+}
+.stat .v.hi { color: var(--bad); }
+.stat .v.mid { color: var(--warn); }
+.stat .v.lo { color: var(--good); }
+
+#trace {
+  position: absolute; left: 14px; bottom: 14px; right: 14px; height: 96px;
+  background: rgba(16,19,25,.86); border: 1px solid var(--rule); border-radius: 6px;
+}
+.banner {
+  position: absolute; top: 14px; right: 14px;
+  background: rgba(240,129,63,.14); border: 1px solid var(--accent-2); color: var(--accent-2);
+  border-radius: 6px; padding: 7px 12px;
+  font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 12px;
+  display: none;
+}
+.legend {
+  position: absolute; right: 14px; bottom: 122px;
+  background: rgba(16,19,25,.86); border: 1px solid var(--rule); border-radius: 6px;
+  padding: 8px 10px; font-size: 11px; color: var(--ink-2); max-width: 230px;
+}
+.legend canvas { display: block; width: 100%; height: 9px; border-radius: 2px; margin: 5px 0 3px; }
+.legend .ends { display: flex; justify-content: space-between;
+  font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 9.5px; color: var(--ink-3); }
+
+@media (max-width: 860px) {
+  .app { grid-template-columns: 1fr; grid-template-rows: 46vh 54vh; }
+  .panel { border-right: none; border-bottom: 1px solid var(--rule); order: 2; }
+  .stage { order: 1; }
+  #trace { height: 68px; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="app">
+<div class="panel">
+  <h1>Trigeminal dissonance explorer</h1>
+  <p class="sub">The same coupled-oscillator model as <code>sim/</code>, running live. Kernels
+  are energy-matched, so only their <em>shape</em> differs between conditions.</p>
+
+  <fieldset>
+    <legend>Geometry</legend>
+    <div class="btnrow" id="geomBtns">
+      <button class="wide on" data-geom="tree">Trigeminal tree</button>
+      <button class="wide" data-geom="lattice">Lattice</button>
+      <button class="wide" data-geom="hierarchical">Layered</button>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <label for="nodes">Nodes</label>
+      <input type="range" id="nodes" min="200" max="1200" step="100" value="600">
+      <span class="val" id="nodesV">600</span>
+    </div>
+    <p class="hint" id="geomNote"></p>
+  </fieldset>
+
+  <fieldset>
+    <legend>Coupling kernel</legend>
+    <div class="row"><label for="k1">K₁ near</label>
+      <input type="range" id="k1" min="-1" max="1" step="0.01" value="0.6"><span class="val" id="k1V">0.60</span></div>
+    <div class="row"><label for="k2">K₂</label>
+      <input type="range" id="k2" min="-1" max="1" step="0.01" value="0.2"><span class="val" id="k2V">0.20</span></div>
+    <div class="row"><label for="k3">K₃</label>
+      <input type="range" id="k3" min="-1" max="1" step="0.01" value="-0.1"><span class="val" id="k3V">-0.10</span></div>
+    <div class="row"><label for="k4">K₄ far</label>
+      <input type="range" id="k4" min="-1" max="1" step="0.01" value="-0.2"><span class="val" id="k4V">-0.20</span></div>
+    <div class="row"><label for="ksw">K<sub>SW</sub></label>
+      <input type="range" id="ksw" min="-3" max="3" step="0.05" value="0"><span class="val" id="kswV">0.00</span></div>
+    <div class="row"><label for="cstr">Strength</label>
+      <input type="range" id="cstr" min="0.5" max="10" step="0.1" value="4"><span class="val" id="cstrV">4.0</span></div>
+    <div class="btnrow" style="margin-top:8px">
+      <button data-kernel="baseline">baseline</button>
+      <button data-kernel="flat">flat</button>
+      <button data-kernel="mexican_hat">Mexican hat</button>
+      <button data-kernel="5meo_plate">5-MeO</button>
+      <button data-kernel="dmt_plate">DMT</button>
+      <button data-kernel="checkerboard">checkerboard</button>
+      <button data-kernel="pinwheel">pinwheel</button>
+      <button data-kernel="traveling_wave">traveling</button>
+    </div>
+    <p class="hint">Net coupling <span id="ksum" class="val" style="display:inline">+1.82</span> rad/s
+    — what a fully synchronised node feels. Positive drives coherence, negative frustrates it.</p>
+  </fieldset>
+
+  <fieldset>
+    <legend>Hypothalamic drive</legend>
+    <div class="row"><label for="amp">Amplitude A</label>
+      <input type="range" id="amp" min="0" max="10" step="0.1" value="4"><span class="val" id="ampV">4.0</span></div>
+    <div class="row"><label for="omd">Ω (Hz)</label>
+      <input type="range" id="omd" min="1" max="12" step="0.1" value="5"><span class="val" id="omdV">5.0</span></div>
+    <div class="row"><label for="wave">Waveform</label>
+      <select id="wave">
+        <option value="constant">constant</option>
+        <option value="square">circadian pulses</option>
+      </select></div>
+    <div class="row"><label for="duty">Duty</label>
+      <input type="range" id="duty" min="0.05" max="0.9" step="0.05" value="0.35"><span class="val" id="dutyV">0.35</span></div>
+    <p class="hint">Dissonance peaks at <em>partial</em> entrainment. Push A past the band and
+    the tree locks completely and goes quiet.</p>
+  </fieldset>
+
+  <fieldset>
+    <legend>Substrate</legend>
+    <div class="row"><label for="sw">σ<sub>ω</sub> (Hz)</label>
+      <input type="range" id="sw" min="0" max="1" step="0.01" value="0.25"><span class="val" id="swV">0.25</span></div>
+    <div class="row"><label for="noise">Noise σ</label>
+      <input type="range" id="noise" min="0" max="3" step="0.05" value="0.05"><span class="val" id="noiseV">0.05</span></div>
+    <div class="row"><label for="dw">V1 detune</label>
+      <input type="range" id="dw" min="0" max="2" step="0.05" value="0.6"><span class="val" id="dwV">0.60</span></div>
+    <p class="hint">σ<sub>ω</sub> is the oxygen handle. V1 detune is how far the peripheral
+    band sits from the relay's.</p>
+  </fieldset>
+
+  <fieldset>
+    <legend>Interventions</legend>
+    <div class="btnrow">
+      <button class="wide" data-iv="dmt">DMT pulse</button>
+      <button class="wide" data-iv="5meo">5-MeO pulse</button>
+    </div>
+    <div class="btnrow" style="margin-top:5px">
+      <button class="wide" data-iv="oxygen">Oxygen</button>
+      <button class="wide" data-iv="sumatriptan">Sumatriptan</button>
+    </div>
+    <div class="row" style="margin-top:8px"><label for="ivdur">Duration</label>
+      <input type="range" id="ivdur" min="2" max="20" step="1" value="8"><span class="val" id="ivdurV">8s</span></div>
+    <p class="hint">DMT swaps in a Mexican-hat kernel, 5-MeO a uniform-positive one, at matched
+    energy. Watch which one actually moves the dissonance.</p>
+  </fieldset>
+
+  <fieldset>
+    <legend>Things to try</legend>
+    <p class="hint" style="margin-top:0">
+    <b>The attack band.</b> Sweep A from 0 upward. Dissonance rises, peaks around
+    partial entrainment, then <em>collapses</em> as the tree locks completely. More drive
+    is not more pain.<br><br>
+    <b>The clinical anomaly.</b> Sit at the peak and hit DMT, then 5-MeO. Both kernels
+    carry identical total coupling, so any difference is shape alone.<br><br>
+    <b>Noise is not dissonance.</b> Set A = 0 and raise the noise. The field goes visibly
+    incoherent while D falls toward zero — that is the asymmetry/antisymmetry distinction,
+    and the reason the metric is not an entropy metric.<br><br>
+    <b>Geometry.</b> Switch between tree and lattice at the same drive. The difference is
+    real but small, and only above r ≈ 0.7.</p>
+  </fieldset>
+
+  <fieldset>
+    <legend>Caveat</legend>
+    <p class="hint" style="margin-top:0">The dissonance shown here is a <em>streaming
+    approximation</em> of the offline index: cluster tones come from a smoothed running
+    phase advance rather than a windowed spectrum, and the flatness gate is replaced by a
+    frequency-jitter one. It reproduces the offline metric's behaviour — the drive band, the
+    noise dissociation, the DMT/5-MeO ordering — but not its exact values. Quote numbers
+    from <code>sim/</code>, not from this page.</p>
+  </fieldset>
+
+  <fieldset>
+    <legend>Display</legend>
+    <div class="row"><label for="colour">Colour by</label>
+      <select id="colour">
+        <option value="phase">phase</option>
+        <option value="incoherence">local incoherence</option>
+        <option value="cluster">cluster</option>
+        <option value="frequency">natural frequency</option>
+      </select></div>
+    <div class="row"><label for="edges">Edges</label>
+      <input type="range" id="edges" min="0" max="1" step="0.05" value="0.35"><span class="val" id="edgesV">0.35</span></div>
+    <div class="row"><label for="size">Node size</label>
+      <input type="range" id="size" min="1" max="8" step="0.5" value="3.5"><span class="val" id="sizeV">3.5</span></div>
+    <div class="row"><label for="speed">Speed</label>
+      <input type="range" id="speed" min="1" max="12" step="1" value="4"><span class="val" id="speedV">4×</span></div>
+    <div class="btnrow" style="margin-top:8px">
+      <button class="wide on" id="play">Pause</button>
+      <button class="wide" id="reset">Reset phases</button>
+    </div>
+  </fieldset>
+</div>
+
+<div class="stage">
+  <canvas id="view"></canvas>
+  <div class="hud">
+    <div class="stat"><span class="k">dissonance D</span><span class="v" id="sD">—</span></div>
+    <div class="stat"><span class="k">r global</span><span class="v" id="sR">—</span></div>
+    <div class="stat"><span class="k">fragmentation</span><span class="v" id="sF">—</span></div>
+    <div class="stat"><span class="k">sim time</span><span class="v" id="sT">—</span></div>
+  </div>
+  <div class="banner" id="banner"></div>
+  <div class="legend">
+    <span id="legTitle">Phase, 0 to 2π</span>
+    <canvas id="legBar" width="220" height="9"></canvas>
+    <div class="ends"><span id="legLo">0</span><span id="legHi">2π</span></div>
+  </div>
+  <canvas id="trace"></canvas>
+</div>
+</div>
+
+<script>
+"use strict";
+const TAU = Math.PI * 2;
+
+/* ============================ colour ============================ */
+// Cyclic map for phase: a phase of 0 and 2π must land on the same colour, so this is the
+// one place a non-monotone ramp is correct.
+function cyclic(t) {
+  const a = t * TAU;
+  const r = Math.round(128 + 118 * Math.cos(a));
+  const g = Math.round(128 + 118 * Math.cos(a - TAU / 3));
+  const b = Math.round(128 + 118 * Math.cos(a - 2 * TAU / 3));
+  return [r, g, b];
+}
+// Single-hue sequential ramp for magnitude.
+function seq(t) {
+  t = Math.min(1, Math.max(0, t));
+  const stops = [[16,22,34],[32,74,140],[72,140,222],[150,196,246],[236,244,255]];
+  const x = t * (stops.length - 1), i = Math.min(stops.length - 2, Math.floor(x)), f = x - i;
+  return [0,1,2].map(c => Math.round(stops[i][c] + f * (stops[i+1][c] - stops[i][c])));
+}
+const CATEG = ["#5b9cf0","#f0813f","#35c08a","#e0c040","#e07ba4","#7fd4d0",
+               "#a98cf0","#ef6b52","#8fbf5a","#d3a0e0","#59b0d8","#e0a06a",
+               "#6fd68f","#c9d24f","#f09ac0","#79c6f0"];
+const hexRGB = h => [parseInt(h.slice(1,3),16), parseInt(h.slice(3,5),16), parseInt(h.slice(5,7),16)];
+
+/* ============================ kernels ============================ */
+const KERNELS = {
+  baseline:       {k:[ 0.6, 0.2,-0.1,-0.2], ksw: 0},
+  flat:           {k:[ 1.0, 1.0, 1.0, 1.0], ksw: 0},
+  mexican_hat:    {k:[-1.0, 0.1,-0.6,-0.9], ksw: 0},
+  "5meo_plate":   {k:[ 0.93,0.17,0.61,-0.64], ksw: 0},
+  dmt_plate:      {k:[-1.0, 0.09,-0.63,-0.90], ksw: 0},
+  checkerboard:   {k:[-20.0,15.8,12.1,-16.8], ksw:-2.4},
+  pinwheel:       {k:[ 19.0,15.8,14.0,  1.2], ksw:-2.4},
+  traveling_wave: {k:[ 19.0, 4.1,-5.4, 20.0], ksw:-2.4},
+};
+
+/* ============================ graphs ============================ */
+// Each builder returns {n, adj (array of arrays), pos, compartment, depth, parent}.
+// compartment: 0 = central relay, 1 = ganglion, 2..4 = divisions / bulk.
+
+function buildTree(nTarget, rng) {
+  const nCentral = Math.max(4, Math.round(0.05 * nTarget));
+  const comp = [], depth = [], parent = [], adj = [];
+  const add = (c, d, p) => { comp.push(c); depth.push(d); parent.push(p); adj.push([]); return comp.length - 1; };
+  const link = (a, b) => { if (a !== b && !adj[a].includes(b)) { adj[a].push(b); adj[b].push(a); } };
+
+  const central = [];
+  for (let i = 0; i < nCentral; i++) central.push(add(0, 0, -1));
+  for (let i = 0; i < nCentral; i++)
+    for (let j = i + 1; j < nCentral; j++) if (rng() < 0.6) link(central[i], central[j]);
+  for (let i = 1; i < nCentral; i++) link(central[i - 1], central[i]);
+
+  const ganglion = add(1, 1, central[0]);
+  for (let i = 0; i < Math.max(1, (nCentral / 3) | 0); i++) link(ganglion, central[i]);
+
+  // V1 carries most of the tree: cluster pain is overwhelmingly V1/periorbital.
+  const divisions = [[2, 0.6], [3, 0.2], [4, 0.2]];
+  const nPeripheral = nTarget - comp.length;
+  for (const [c, w] of divisions) {
+    let budget = Math.round(w * nPeripheral);
+    const root = add(c, 2, ganglion); link(ganglion, root); budget--;
+    const frontier = [[root, 2]];
+    while (budget > 0 && frontier.length) {
+      const [node, d] = frontier.shift();
+      if (d >= 12) continue;
+      const b = Math.min(5, Math.max(1, 1 + poisson(rng, 2)));
+      for (let q = 0; q < b && budget > 0; q++) {
+        let m = Math.max(1, Math.min(16, Math.round(Math.exp(Math.log(4) + 0.35 * gauss(rng)))));
+        m = Math.min(m, budget);
+        let prev = node;
+        for (let s = 0; s < m; s++) { const nx = add(c, d + 1, prev); link(prev, nx); prev = nx; budget--; }
+        frontier.push([prev, d + 1]);
+      }
+    }
+  }
+  return { n: comp.length, adj, comp, depth, parent, pos: treeLayout(depth, parent, rng), kind: "tree" };
+}
+
+function treeLayout(depth, parent, rng) {
+  const n = depth.length, angle = new Float64Array(n), pos = new Float64Array(n * 2);
+  const order = Array.from({ length: n }, (_, i) => i).sort((a, b) => depth[a] - depth[b]);
+  const counters = new Int32Array(n);
+  for (const node of order) {
+    const p = parent[node];
+    if (p < 0) angle[node] = rng() * TAU;
+    else {
+      const k = counters[p]++;
+      const spread = 1.7 / Math.pow(1 + depth[node], 1.05);
+      angle[node] = angle[p] + spread * (((k + 1) / 2) | 0) * (k % 2 ? 1 : -1);
+    }
+  }
+  for (let i = 0; i < n; i++) {
+    const r = 0.4 + depth[i];
+    pos[2 * i] = r * Math.cos(angle[i]);
+    pos[2 * i + 1] = r * Math.sin(angle[i]);
+  }
+  return pos;
+}
+
+function buildLattice(nTarget) {
+  const side = Math.max(6, Math.round(Math.sqrt(nTarget))), n = side * side;
+  const adj = Array.from({ length: n }, () => []), pos = new Float64Array(n * 2);
+  const comp = new Int8Array(n).fill(5), depth = new Int32Array(n);
+  const id = (i, j) => ((i + side) % side) * side + ((j + side) % side);
+  const link = (a, b) => { if (!adj[a].includes(b)) { adj[a].push(b); adj[b].push(a); } };
+  for (let i = 0; i < side; i++) for (let j = 0; j < side; j++) {
+    const a = id(i, j);
+    link(a, id(i, j + 1)); link(a, id(i + 1, j));            // periodic boundary
+    pos[2 * a] = j - side / 2; pos[2 * a + 1] = i - side / 2;
+  }
+  // a comparable relay region, so compartment-targeted levers mean something here too
+  const nC = Math.max(4, Math.round(0.05 * n));
+  const byR = Array.from({ length: n }, (_, i) => i)
+    .sort((a, b) => (pos[2*a]**2 + pos[2*a+1]**2) - (pos[2*b]**2 + pos[2*b+1]**2));
+  for (let i = 0; i < nC; i++) comp[byR[i]] = 0;
+  return { n, adj, comp, depth, parent: new Int32Array(n).fill(-1), pos, kind: "lattice", side };
+}
+
+function buildHierarchical(nTarget) {
+  let best = 6, bestErr = Infinity;
+  const sidesFor = s => { const out = [s]; for (let l = 0; l < 3; l++) out.push(Math.max(2, Math.ceil(out[out.length-1] / 2))); return out; };
+  for (let s = 6; s < 60; s++) {
+    const tot = sidesFor(s).reduce((a, x) => a + x * x, 0);
+    if (Math.abs(tot - nTarget) < bestErr) { bestErr = Math.abs(tot - nTarget); best = s; }
+  }
+  const sides = sidesFor(best), offs = [];
+  let tot = 0; for (const s of sides) { offs.push(tot); tot += s * s; }
+  const n = tot, adj = Array.from({ length: n }, () => []), pos = new Float64Array(n * 2);
+  const comp = new Int8Array(n).fill(5), depth = new Int32Array(n);
+  const nid = (l, i, j) => offs[l] + i * sides[l] + j;
+  const link = (a, b) => { if (!adj[a].includes(b)) { adj[a].push(b); adj[b].push(a); } };
+  // Layers laid out left to right at true relative size, so the pyramid is visible.
+  let xCursor = 0;
+  const gap = sides[0] * 0.22;
+  for (let l = 0; l < sides.length; l++) {
+    const s = sides[l], scale = sides[0] / s;
+    for (let i = 0; i < s; i++) for (let j = 0; j < s; j++) {
+      const a = nid(l, i, j); depth[a] = l;
+      pos[2 * a] = xCursor + j * scale;
+      pos[2 * a + 1] = (i - (s - 1) / 2) * scale;
+      if (j + 1 < s) link(a, nid(l, i, j + 1));
+      if (i + 1 < s) link(a, nid(l, i + 1, j));
+      if (l + 1 < sides.length) {
+        const up = sides[l + 1];
+        link(a, nid(l + 1, Math.min(i >> 1, up - 1), Math.min(j >> 1, up - 1)));
+      }
+    }
+    xCursor += sides[0] + gap;
+  }
+  const nC = Math.max(4, Math.round(0.05 * n));
+  const byDepth = Array.from({ length: n }, (_, i) => i).sort((a, b) => depth[b] - depth[a]);
+  for (let i = 0; i < nC; i++) comp[byDepth[i]] = 0;
+  // centre the whole row on the origin
+  let cx = 0; for (let i = 0; i < n; i++) cx += pos[2 * i]; cx /= n;
+  for (let i = 0; i < n; i++) pos[2 * i] -= cx;
+  return { n, adj, comp, depth, parent: new Int32Array(n).fill(-1), pos, kind: "hierarchical", sides, offs };
+}
+
+/* ---- geodesic distance shells, on the base graph (before small-world links) ---- */
+function buildShells(g, nShells = 4, cap = 8) {
+  const n = g.n, shells = [];
+  for (let s = 0; s < nShells; s++) shells.push({ idx: [], ptr: new Int32Array(n + 1) });
+  const dist = new Int16Array(n), stamp = new Int32Array(n).fill(-1);
+  const queue = new Int32Array(n);
+  for (let src = 0; src < n; src++) {
+    let head = 0, tail = 0;
+    queue[tail++] = src; stamp[src] = src; dist[src] = 0;
+    const buckets = shells.map(() => []);
+    while (head < tail) {
+      const v = queue[head++], d = dist[v];
+      if (d >= cap) continue;
+      for (const w of g.adj[v]) {
+        if (stamp[w] === src) continue;
+        stamp[w] = src; dist[w] = d + 1; queue[tail++] = w;
+        const s = Math.min(nShells - 1, d);       // hop d+1 -> shell index d, last shell absorbs the rest
+        buckets[s].push(w);
+      }
+    }
+    for (let s = 0; s < nShells; s++) {
+      shells[s].ptr[src + 1] = shells[s].ptr[src] + buckets[s].length;
+      for (const w of buckets[s]) shells[s].idx.push(w);
+    }
+  }
+  return shells.map(s => ({ idx: Int32Array.from(s.idx), ptr: s.ptr }));
+}
+
+/* ---- small-world links: each node wired to two random others, per III.2 ---- */
+function buildSmallWorld(n, per, rng) {
+  const adj = Array.from({ length: n }, () => []);
+  for (let i = 0; i < n; i++) for (let q = 0; q < per; q++) {
+    const j = (rng() * n) | 0;
+    if (j !== i) { adj[i].push(j); adj[j].push(i); }
+  }
+  const ptr = new Int32Array(n + 1), idx = [];
+  for (let i = 0; i < n; i++) { ptr[i + 1] = ptr[i] + adj[i].length; idx.push(...adj[i]); }
+  return { idx: Int32Array.from(idx), ptr };
+}
+
+/* ---- cluster partition: farthest-point seeds + nearest-seed assignment ---- */
+// Built the same way on every geometry, so cluster count and typical size are matched and
+// the dissonance index compares like with like across them.
+function partition(g, k, rng) {
+  const n = g.n, bfs = src => {
+    const d = new Int32Array(n).fill(-1), q = new Int32Array(n);
+    let h = 0, t = 0; q[t++] = src; d[src] = 0;
+    while (h < t) { const v = q[h++]; for (const w of g.adj[v]) if (d[w] < 0) { d[w] = d[v] + 1; q[t++] = w; } }
+    for (let i = 0; i < n; i++) if (d[i] < 0) d[i] = 1e6;
+    return d;
+  };
+  // Standard farthest-point initialisation: seed from a node on the graph's periphery
+  // rather than a random one. On a tree, a random first seed landing in the dense relay
+  // leaves one Voronoi cell absorbing most of the network.
+  const d0 = bfs((rng() * n) | 0);
+  let far = 0;
+  for (let i = 0; i < n; i++) if (d0[i] < 1e6 && d0[i] > d0[far]) far = i;
+  const seeds = [far];
+  let dmin = bfs(far);
+  for (let s = 1; s < k; s++) {
+    let bi = 0, bv = -1;
+    for (let i = 0; i < n; i++) if (dmin[i] < 1e6 && dmin[i] > bv) { bv = dmin[i]; bi = i; }
+    seeds.push(bi);
+    const d = bfs(bi);
+    for (let i = 0; i < n; i++) dmin[i] = Math.min(dmin[i], d[i]);
+  }
+  const dists = seeds.map(bfs), lab = new Int32Array(n);
+  for (let i = 0; i < n; i++) {
+    let bi = 0, bv = Infinity;
+    for (let s = 0; s < seeds.length; s++) if (dists[s][i] < bv) { bv = dists[s][i]; bi = s; }
+    lab[i] = bi;
+  }
+  return lab;
+}
+
+/* ============================ rng ============================ */
+function mulberry(seed) {
+  return function () {
+    seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function gauss(rng) {
+  let u = 0, v = 0;
+  while (u === 0) u = rng();
+  while (v === 0) v = rng();
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(TAU * v);
+}
+function poisson(rng, lam) {
+  const L = Math.exp(-lam); let k = 0, p = 1;
+  do { k++; p *= rng(); } while (p > L);
+  return k - 1;
+}
+
+/* ============================ simulation ============================ */
+const P = {                      // live parameters, mirrored from the controls
+  geom: "tree", nodes: 600,
+  k: [0.6, 0.2, -0.1, -0.2], ksw: 0, cstr: 4,
+  amp: 4, omd: 5, wave: "constant", duty: 0.35, period: 24,
+  sigOmega: 0.25, noise: 0.05, detune: 0.6,
+  colour: "phase", edges: 0.35, size: 3.5, speed: 4,
+};
+const DT = 0.004, N_CLUSTERS = 16;
+
+let G = null, S = null, running = true;
+let intervention = null;         // {label, until, kernel?, sigmaScale?, gainScale?}
+
+function rebuild() {
+  const rng = mulberry(12345);
+  G = P.geom === "tree" ? buildTree(P.nodes, rng)
+    : P.geom === "lattice" ? buildLattice(P.nodes)
+    : buildHierarchical(P.nodes);
+  G.shells = buildShells(G);
+  G.sw = buildSmallWorld(G.n, 2, rng);
+  G.cluster = partition(G, N_CLUSTERS, rng);
+  G.shellSize = G.shells.map(s => {
+    const c = new Float32Array(G.n);
+    for (let i = 0; i < G.n; i++) c[i] = s.ptr[i + 1] - s.ptr[i];
+    return c;
+  });
+  G.swSize = new Float32Array(G.n);
+  for (let i = 0; i < G.n; i++) G.swSize[i] = Math.max(1, G.sw.ptr[i + 1] - G.sw.ptr[i]);
+  resetState();
+  fitView();
+  document.getElementById("geomNote").textContent =
+    P.geom === "tree" ? `${G.n} nodes · relay + ganglion + V1/V2/V3, V1 weighted 60%`
+    : P.geom === "lattice" ? `${G.n} nodes · ${G.side}×${G.side}, periodic — the geometry that can host a consonant mode`
+    : `${G.n} nodes · layers ${G.sides.join("→")}, drawn left to right`;
+}
+
+function resetState() {
+  const n = G.n, rng = mulberry(999);
+  S = {
+    th: new Float64Array(n), om: new Float64Array(n), omBase: new Float64Array(n),
+    sn: new Float64Array(n), cs: new Float64Array(n),
+    t: 0, frame: 0,
+    zr: new Float64Array(N_CLUSTERS), zi: new Float64Array(N_CLUSTERS),
+    camp: new Float64Array(N_CLUSTERS), cfreq: new Float64Array(N_CLUSTERS),
+    cjit: new Float64Array(N_CLUSTERS),
+    prevAng: new Float64Array(N_CLUSTERS), inc: new Float32Array(n),
+    hist: [], D: 0, r: 0, frag: 0,
+  };
+  for (let i = 0; i < n; i++) S.th[i] = rng() * TAU;
+  drawOmega();
+}
+function drawOmega() {
+  const rng = mulberry(4242);
+  for (let i = 0; i < G.n; i++) {
+    const mu = TAU * (G.comp[i] === 0 ? 5.0 : 5.0 + P.detune);
+    S.omBase[i] = mu + TAU * P.sigOmega * gauss(rng);
+  }
+  applyOmega();
+}
+function applyOmega() {
+  // Oxygen contracts the spread toward each node's compartment mean rather than resampling,
+  // so the intervention is a deformation of the same substrate, not a different draw.
+  const scale = intervention && intervention.sigmaScale != null ? intervention.sigmaScale : 1;
+  for (let i = 0; i < G.n; i++) {
+    const mu = TAU * (G.comp[i] === 0 ? 5.0 : 5.0 + P.detune);
+    S.om[i] = mu + scale * (S.omBase[i] - mu);
+  }
+}
+
+// Energy matching: every kernel is rescaled so Σ|K_s| equals the coupling strength, so two
+// conditions can differ only in shape. This is IX.4's requirement made structural.
+function activeKernel() {
+  const src = intervention && intervention.kernel ? KERNELS[intervention.kernel] : { k: P.k, ksw: P.ksw };
+  const raw = src.k, l1 = raw.reduce((a, x) => a + Math.abs(x), 0) || 1;
+  const f = P.cstr / l1;
+  return { k: raw.map(x => x * f), ksw: (src.ksw || 0) * f };
+}
+
+function driveEnvelope(t) {
+  if (P.wave === "constant") return 1;
+  const ph = (t / P.period) % 1, r = Math.min(1.5 / P.period, P.duty / 2);
+  if (ph >= P.duty) return 0;
+  if (r <= 0) return 1;
+  return Math.max(0, Math.min(1, Math.min(ph / r, (P.duty - ph) / r)));
+}
+
+function step(dt) {
+  const n = G.n, { k, ksw } = activeKernel();
+  const th = S.th, sn = S.sn, cs = S.cs;
+  for (let i = 0; i < n; i++) { sn[i] = Math.sin(th[i]); cs[i] = Math.cos(th[i]); }
+
+  const gain = new Float64Array(n).fill(1);
+  if (intervention && intervention.gainScale != null)
+    for (let i = 0; i < n; i++) if (G.comp[i] !== 0) gain[i] = intervention.gainScale;
+
+  const g = driveEnvelope(S.t);
+  const thD = TAU * P.omd * S.t;
+  const A = P.amp * g;
+  const sqdt = Math.sqrt(dt), rng = Math.random;
+
+  for (let i = 0; i < n; i++) {
+    let accS = 0, accC = 0;
+    for (let s = 0; s < 4; s++) {
+      const sh = G.shells[s], lo = sh.ptr[i], hi = sh.ptr[i + 1];
+      if (hi === lo || k[s] === 0) continue;
+      let ss = 0, cc = 0;
+      for (let p = lo; p < hi; p++) { const j = sh.idx[p]; ss += sn[j]; cc += cs[j]; }
+      const w = k[s] / (hi - lo);              // per-shell normalisation
+      accS += w * ss; accC += w * cc;
+    }
+    let c = cs[i] * accS - sn[i] * accC;
+    if (ksw !== 0) {
+      const lo = G.sw.ptr[i], hi = G.sw.ptr[i + 1];
+      let ss = 0, cc = 0;
+      for (let p = lo; p < hi; p++) { const j = G.sw.idx[p]; ss += sn[j]; cc += cs[j]; }
+      c += ksw * (cs[i] * ss - sn[i] * cc) / G.swSize[i];
+    }
+    let d = S.om[i] + gain[i] * c;
+    if (A > 0) d += A * Math.sin(thD - th[i]);
+    th[i] += d * dt + P.noise * sqdt * (rng() * 2 - 1) * 1.732;
+  }
+  for (let i = 0; i < n; i++) { const x = th[i] % TAU; th[i] = x < 0 ? x + TAU : x; }
+  S.t += dt; S.frame++;
+}
+
+/* ============================ metrics ============================ */
+// A streaming version of the offline index: cluster mean fields give each cluster a tone
+// (frequency from the running phase advance, amplitude from its coherence), and D is the
+// amplitude-weighted pairwise roughness over those tones. Keeping the amplitude scale is
+// what makes noise score low — an incoherent cluster still has an arbitrary peak frequency.
+const NPART = 6, ROLLOFF = 0.88, BAND = 0.01, B1 = 3.5, B2 = 5.75;
+const GMAX = Math.pow(B1 / B2, B1 / (B2 - B1)) - Math.pow(B1 / B2, B2 / (B2 - B1));
+let SETH_REF = null;
+function rawRough(fa, fb) {
+  let tot = 0, amp = 0;
+  for (let p = 1; p <= NPART; p++) {
+    const ap = Math.pow(ROLLOFF, p - 1); amp += ap;
+    for (let q = 1; q <= NPART; q++) {
+      const aq = Math.pow(ROLLOFF, q - 1);
+      const x = p * fa, y = q * fb, d = Math.abs(x - y);
+      const s = 0.24 / Math.max(BAND * Math.min(x, y), 1e-9);
+      const gg = Math.exp(-B1 * s * d) - Math.exp(-B2 * s * d);
+      tot += ap * aq * Math.max(0, gg);
+    }
+  }
+  return tot / (GMAX * amp * amp);
+}
+function seRef() {
+  if (SETH_REF) return SETH_REF;
+  let best = 1e-9;
+  for (let i = 0; i <= 600; i++) best = Math.max(best, rawRough(5, 5 * (1 + i / 600)));
+  return (SETH_REF = best);
+}
+function roughness(fa, fb) { return fa <= 0 || fb <= 0 ? 0 : Math.min(1, rawRough(fa, fb) / seRef()); }
+
+// The incommensurability half: how well the whole tone set fits one harmonic series.
+function templateFit(freqs, amps) {
+  const f = [], a = [];
+  for (let i = 0; i < freqs.length; i++) if (amps[i] > 0 && freqs[i] > 0) { f.push(freqs[i]); a.push(amps[i]); }
+  if (f.length < 2) return 1;
+  const fmin = Math.min(...f), fmax = Math.max(...f);
+  const nMax = Math.max(16, Math.ceil(fmax / fmin)), tol = 0.02;
+  const lo = Math.log(fmin / nMax), hi = Math.log(fmin);
+  let best = 0, aSum = a.reduce((x, y) => x + y, 0);
+  for (let gi = 0; gi <= 700; gi++) {
+    const f0 = Math.exp(lo + (hi - lo) * gi / 700);
+    let sc = 0;
+    for (let i = 0; i < f.length; i++) {
+      const ratio = f[i] / f0, nn = Math.min(nMax, Math.max(1, Math.round(ratio)));
+      const res = Math.abs(ratio - nn);                    // absolute, not relative to n
+      sc += a[i] * Math.exp(-(res / tol) * (res / tol));
+    }
+    best = Math.max(best, sc / aSum);
+  }
+  return best;
+}
+
+function updateMetrics() {
+  const n = G.n, nc = N_CLUSTERS;
+  const zr = new Float64Array(nc), zi = new Float64Array(nc), cnt = new Int32Array(nc);
+  let gr = 0, gi = 0;
+  for (let i = 0; i < n; i++) {
+    const s = Math.sin(S.th[i]), c = Math.cos(S.th[i]), cl = G.cluster[i];
+    zr[cl] += c; zi[cl] += s; cnt[cl]++; gr += c; gi += s;
+  }
+  S.r = Math.hypot(gr / n, gi / n);
+  let rlocal = 0;
+  const dtRec = DT * Math.max(1, Math.round(P.speed));   // sim seconds between metric updates
+  const freqs = new Float64Array(nc), amps = new Float64Array(nc);
+  for (let c = 0; c < nc; c++) {
+    if (!cnt[c]) continue;
+    const x = zr[c] / cnt[c], y = zi[c] / cnt[c], mag = Math.hypot(x, y);
+    rlocal += mag;
+    const ang = Math.atan2(y, x);
+    let d = ang - S.prevAng[c];
+    while (d > Math.PI) d -= TAU;
+    while (d < -Math.PI) d += TAU;
+    S.prevAng[c] = ang;
+    const inst = d / (dtRec * TAU);               // Hz
+    // Streaming stand-in for the offline spectral-flatness gate. A cluster driven by noise
+    // has no stable tone, so its instantaneous frequency jitters; a genuinely coherent
+    // cluster's does not. Down-weighting by that jitter is what stops incoherent clusters
+    // contributing structured dissonance, which is the whole asymmetry/antisymmetry point.
+    S.cjit[c] = S.cjit[c] * 0.9 + Math.abs(inst - S.cfreq[c]) * 0.1;
+    S.cfreq[c] = S.cfreq[c] * 0.88 + inst * 0.12;
+    S.camp[c] = S.camp[c] * 0.88 + mag * 0.12;
+    freqs[c] = S.cfreq[c];
+    amps[c] = S.camp[c] * Math.exp(-S.cjit[c] / 0.6);
+  }
+  rlocal /= nc;
+  S.frag = rlocal - S.r;
+
+  for (let c = 0; c < nc; c++) if (!(freqs[c] > 0.5 && freqs[c] < 20)) amps[c] = 0;
+  let tot = 0, pairs = 0;
+  for (let a = 0; a < nc; a++) for (let b = a + 1; b < nc; b++) {
+    tot += amps[a] * amps[b] * roughness(freqs[a], freqs[b]); pairs++;
+  }
+  const dRough = pairs ? tot / pairs : 0;
+  let wsum = 0; for (let a = 0; a < nc; a++) for (let b = a + 1; b < nc; b++) wsum += amps[a] * amps[b];
+  const dInharm = (1 - templateFit(freqs, amps)) * (pairs ? wsum / pairs : 0);
+  S.D = Math.max(dRough, dInharm);              // the composite, as in metrics.py
+
+  // local incoherence, for the alternative colouring
+  for (let i = 0; i < n; i++) {
+    let sx = Math.cos(S.th[i]), sy = Math.sin(S.th[i]), m = 1;
+    for (const j of G.adj[i]) { sx += Math.cos(S.th[j]); sy += Math.sin(S.th[j]); m++; }
+    S.inc[i] = 1 - Math.hypot(sx, sy) / m;
+  }
+
+  S.hist.push([S.t, S.D, S.r]);
+  if (S.hist.length > 900) S.hist.shift();
+}
+
+/* ============================ rendering ============================ */
+const view = document.getElementById("view"), vctx = view.getContext("2d");
+const trace = document.getElementById("trace"), tctx = trace.getContext("2d");
+let VX = 0, VY = 0, VS = 1;
+
+function fitView() {
+  let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+  for (let i = 0; i < G.n; i++) {
+    x0 = Math.min(x0, G.pos[2*i]); x1 = Math.max(x1, G.pos[2*i]);
+    y0 = Math.min(y0, G.pos[2*i+1]); y1 = Math.max(y1, G.pos[2*i+1]);
+  }
+  const w = view.clientWidth || 800, h = view.clientHeight || 600;
+  const pad = 46;
+  VS = Math.min((w - 2*pad) / Math.max(1e-6, x1 - x0), (h - 2*pad - 90) / Math.max(1e-6, y1 - y0));
+  VX = w / 2 - VS * (x0 + x1) / 2;
+  VY = (h - 70) / 2 - VS * (y0 + y1) / 2;
+}
+function sizeCanvas(cv, ctx) {
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const w = cv.clientWidth, h = cv.clientHeight;
+  if (cv.width !== w * dpr || cv.height !== h * dpr) {
+    cv.width = w * dpr; cv.height = h * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+}
+
+function nodeColour(i) {
+  if (P.colour === "phase") return cyclic(S.th[i] / TAU);
+  if (P.colour === "incoherence") return seq(S.inc[i] / 0.9);
+  if (P.colour === "frequency") return seq((S.om[i] / TAU - 4.2) / 2.6);
+  return hexRGB(CATEG[G.cluster[i] % CATEG.length]);
+}
+
+function render() {
+  sizeCanvas(view, vctx);
+  const w = view.clientWidth, h = view.clientHeight;
+  vctx.fillStyle = "#090b0e"; vctx.fillRect(0, 0, w, h);
+
+  if (P.edges > 0.01) {
+    vctx.strokeStyle = `rgba(120,140,175,${0.10 * P.edges})`;
+    vctx.lineWidth = 0.6;
+    vctx.beginPath();
+    for (let i = 0; i < G.n; i++) for (const j of G.adj[i]) {
+      if (j < i) continue;
+      vctx.moveTo(VX + VS * G.pos[2*i], VY + VS * G.pos[2*i+1]);
+      vctx.lineTo(VX + VS * G.pos[2*j], VY + VS * G.pos[2*j+1]);
+    }
+    vctx.stroke();
+  }
+  const rad = P.size;
+  for (let i = 0; i < G.n; i++) {
+    const [r, g, b] = nodeColour(i);
+    vctx.fillStyle = `rgb(${r},${g},${b})`;
+    vctx.beginPath();
+    vctx.arc(VX + VS * G.pos[2*i], VY + VS * G.pos[2*i+1], rad, 0, TAU);
+    vctx.fill();
+  }
+  renderTrace();
+}
+
+function renderTrace() {
+  sizeCanvas(trace, tctx);
+  const w = trace.clientWidth, h = trace.clientHeight;
+  tctx.clearRect(0, 0, w, h);
+  if (S.hist.length < 2) return;
+  const pad = 8, innerH = h - 2 * pad;
+  const dmax = Math.max(0.05, ...S.hist.map(p => p[1]));
+  tctx.strokeStyle = "rgba(120,140,175,.22)"; tctx.lineWidth = 1;
+  tctx.beginPath(); tctx.moveTo(0, h - pad); tctx.lineTo(w, h - pad); tctx.stroke();
+  const draw = (idx, colour, scale) => {
+    tctx.strokeStyle = colour; tctx.lineWidth = 1.8; tctx.beginPath();
+    S.hist.forEach((p, i) => {
+      const x = (i / (S.hist.length - 1)) * w;
+      const y = h - pad - (p[idx] / scale) * innerH;
+      i ? tctx.lineTo(x, y) : tctx.moveTo(x, y);
+    });
+    tctx.stroke();
+  };
+  draw(2, "#35c08a", 1);       // r_global, 0..1
+  draw(1, "#ef6b52", dmax);    // dissonance, autoscaled
+  tctx.font = '11px "IBM Plex Mono", monospace';
+  tctx.fillStyle = "#ef6b52"; tctx.fillText(`dissonance  (peak ${dmax.toFixed(3)})`, 9, 15);
+  tctx.fillStyle = "#35c08a"; tctx.fillText("r global", 9, 29);
+}
+
+function renderLegend() {
+  const cv = document.getElementById("legBar"), c = cv.getContext("2d");
+  for (let x = 0; x < cv.width; x++) {
+    const t = x / (cv.width - 1);
+    const [r, g, b] = P.colour === "phase" ? cyclic(t)
+      : P.colour === "cluster" ? hexRGB(CATEG[Math.floor(t * (CATEG.length - 1))])
+      : seq(t);
+    c.fillStyle = `rgb(${r},${g},${b})`;
+    c.fillRect(x, 0, 1, cv.height);
+  }
+  const L = { phase: ["Phase", "0", "2π"], incoherence: ["Local incoherence", "locked", "disagreeing"],
+              cluster: ["Cluster membership", "", ""], frequency: ["Natural frequency", "slow", "fast"] }[P.colour];
+  document.getElementById("legTitle").textContent = L[0];
+  document.getElementById("legLo").textContent = L[1];
+  document.getElementById("legHi").textContent = L[2];
+}
+
+/* ============================ loop ============================ */
+function tick() {
+  if (running) {
+    // `speed` is the number of integration substeps per animation frame, so the cost of a
+    // frame is bounded directly. At dt = 4 ms and 8 substeps this runs at roughly real time.
+    const sub = Math.max(1, Math.round(P.speed));
+    for (let s = 0; s < sub; s++) step(DT);
+    updateMetrics();
+    if (intervention && S.t >= intervention.until) { intervention = null; applyOmega(); syncBanner(); }
+  }
+  render();
+  const d = S.D;
+  const el = document.getElementById("sD");
+  el.textContent = d.toFixed(4);
+  el.className = "v " + (d > 0.15 ? "hi" : d > 0.05 ? "mid" : "lo");
+  document.getElementById("sR").textContent = S.r.toFixed(3);
+  document.getElementById("sF").textContent = (S.frag >= 0 ? "+" : "") + S.frag.toFixed(3);
+  document.getElementById("sT").textContent = S.t.toFixed(1) + "s";
+  requestAnimationFrame(tick);
+}
+
+function syncBanner() {
+  const b = document.getElementById("banner");
+  if (!intervention) {
+    b.style.display = "none";
+    document.querySelectorAll("[data-iv]").forEach(x => x.classList.remove("armed"));
+    return;
+  }
+  b.style.display = "block";
+  b.textContent = `${intervention.label} — ${Math.max(0, intervention.until - S.t).toFixed(1)}s left`;
+}
+
+/* ============================ controls ============================ */
+function bindSlider(id, key, fmt, after) {
+  const el = document.getElementById(id), out = document.getElementById(id + "V");
+  const apply = () => {
+    // Fall back to the current value rather than letting a NaN propagate: a single NaN
+    // parameter silently poisons every phase in the network on the next step.
+    const raw = parseFloat(el.value);
+    const cur = Array.isArray(key) ? P[key[0]][key[1]] : P[key];
+    const v = Number.isFinite(raw) ? raw : cur;
+    if (Array.isArray(key)) P[key[0]][key[1]] = v; else P[key] = v;
+    out.textContent = fmt(v);
+    if (after) after(v);
+  };
+  el.addEventListener("input", apply); apply();
+}
+const f2 = v => v.toFixed(2), f1 = v => v.toFixed(1);
+
+function refreshKsum() {
+  const { k } = activeKernel();
+  const s = k.reduce((a, x) => a + x, 0);
+  document.getElementById("ksum").textContent = (s >= 0 ? "+" : "") + s.toFixed(2);
+}
+
+bindSlider("k1", ["k", 0], f2, refreshKsum);
+bindSlider("k2", ["k", 1], f2, refreshKsum);
+bindSlider("k3", ["k", 2], f2, refreshKsum);
+bindSlider("k4", ["k", 3], f2, refreshKsum);
+bindSlider("ksw", "ksw", f2, refreshKsum);
+bindSlider("cstr", "cstr", f1, refreshKsum);
+bindSlider("amp", "amp", f1);
+bindSlider("omd", "omd", f1);
+bindSlider("duty", "duty", f2);
+bindSlider("sw", "sigOmega", f2, () => { if (S) { drawOmega(); } });
+bindSlider("noise", "noise", f2);
+bindSlider("dw", "detune", f2, () => { if (S) drawOmega(); });
+bindSlider("edges", "edges", f2);
+bindSlider("size", "size", f1);
+bindSlider("speed", "speed", v => v + "×");
+bindSlider("ivdur", "ivdur", v => v + "s");
+bindSlider("nodes", "nodes", v => String(v), () => { if (G) rebuild(); });
+
+document.getElementById("wave").addEventListener("change", e => { P.wave = e.target.value; });
+document.getElementById("colour").addEventListener("change", e => { P.colour = e.target.value; renderLegend(); });
+
+document.querySelectorAll("#geomBtns button").forEach(b => b.addEventListener("click", () => {
+  document.querySelectorAll("#geomBtns button").forEach(x => x.classList.remove("on"));
+  b.classList.add("on"); P.geom = b.dataset.geom; rebuild();
+}));
+
+document.querySelectorAll("[data-kernel]").forEach(b => b.addEventListener("click", () => {
+  // The source tabulates kernels on two scale conventions (roughly [-1,1] and [-20,20]), so
+  // both the shell vector and K_SW are divided by the same factor to land in slider range.
+  // That preserves K_SW / |K|, which is the quantity that actually means something.
+  const K = KERNELS[b.dataset.kernel];
+  const m = Math.max(...K.k.map(Math.abs)) || 1;
+  P.k = K.k.map(x => x / m);
+  P.ksw = Math.max(-3, Math.min(3, (K.ksw || 0) / m * 3));
+  ["k1","k2","k3","k4"].forEach((id, i) => {
+    document.getElementById(id).value = P.k[i];
+    document.getElementById(id + "V").textContent = f2(P.k[i]);
+  });
+  document.getElementById("ksw").value = P.ksw;
+  document.getElementById("kswV").textContent = f2(P.ksw);
+  refreshKsum();
+}));
+
+const IV = {
+  dmt:         { label: "DMT — transient Mexican-hat kernel", kernel: "mexican_hat" },
+  "5meo":      { label: "5-MeO — transient uniform-positive kernel", kernel: "5meo_plate" },
+  oxygen:      { label: "Oxygen — σω contracted to 25%", sigmaScale: 0.25 },
+  sumatriptan: { label: "Sumatriptan — peripheral coupling ×0.4", gainScale: 0.4 },
+};
+document.querySelectorAll("[data-iv]").forEach(b => b.addEventListener("click", () => {
+  const spec = IV[b.dataset.iv];
+  intervention = Object.assign({}, spec, { until: S.t + P.ivdur });
+  applyOmega();
+  document.querySelectorAll("[data-iv]").forEach(x => x.classList.remove("armed"));
+  b.classList.add("armed");
+  syncBanner();
+}));
+
+document.getElementById("play").addEventListener("click", e => {
+  running = !running; e.target.textContent = running ? "Pause" : "Play";
+  e.target.classList.toggle("on", running);
+});
+document.getElementById("reset").addEventListener("click", () => { resetState(); });
+window.addEventListener("resize", () => { if (G) fitView(); });
+
+P.ivdur = 8;
+rebuild();
+refreshKsum();
+renderLegend();
+setInterval(syncBanner, 100);
+tick();
+</script>

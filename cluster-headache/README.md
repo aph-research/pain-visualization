@@ -20,6 +20,23 @@ cd cluster-headache
 Results land in `results/<experiment>/` as `summary.json` (including a plain-language
 `verdict`), `records.csv`, `arrays.npz` and PNG figures.
 
+## Playing with it
+
+[`explorer.html`](explorer.html) runs the same model live in a browser — open the file, no
+build step, no server. All three geometries, every kernel and drive parameter on a slider, and
+the four interventions as buttons you can fire mid-attack. It reproduces the offline model's
+behaviour (the drive band, the noise dissociation, the DMT-versus-5-MeO ordering) but its
+dissonance readout is a streaming approximation, so quote numbers from `sim/`, not from it.
+
+Three things worth doing there before reading the rest of this file:
+
+1. Sweep the drive amplitude from zero. Dissonance rises, peaks at partial entrainment, then
+   collapses as the tree locks completely — more drive is not more pain.
+2. Sit at that peak and fire DMT, then 5-MeO. The kernels are energy-matched, so the
+   difference is shape alone.
+3. Set the drive to zero and raise the noise. The field visibly falls apart while dissonance
+   goes to zero. That is the whole asymmetry/antisymmetry distinction in one slider.
+
 ---
 
 ## Layout
@@ -35,6 +52,7 @@ Results land in `results/<experiment>/` as `summary.json` (including a plain-lan
 | `sim/plots.py` | Figures. |
 | `sim/cli.py` | Command line. |
 | `make_report.py` | Builds a single-file HTML report from `results/`, reading every number from the run's own `summary.json`. |
+| `explorer.html` | The same model running live in a browser. Self-contained; just open it. |
 
 Each experiment writes a plain-language `verdict` into its `summary.json` saying what the run
 supports or refutes, in the theory document's own terms. Those verdicts are computed from the
